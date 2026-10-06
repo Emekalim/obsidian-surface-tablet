@@ -579,7 +579,6 @@ export class PenGestureController {
     return Boolean(
       !this.temporaryPan &&
       viewport &&
-      this.dependencies.getModeState().tabletModeEnabled &&
       settings.enableBarrelPan &&
       this.barrelPressedPointers.has(event.pointerId) &&
       isPenContact(event, this.dependencies),

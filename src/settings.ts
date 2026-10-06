@@ -12,7 +12,7 @@ export interface SurfaceTabletSettings {
 export const DEFAULT_SETTINGS: SurfaceTabletSettings = {
   enableTabletModeOnStartup: false,
   enableBarrelDoubleClick: true,
-  doubleClickIntervalMs: 300,
+  doubleClickIntervalMs: 600,
   enableBarrelPan: true,
   panThresholdPx: 5,
   naturalPanDirection: true,

@@ -14,7 +14,7 @@ The plugin provides two mutually exclusive persistent session modes:
 - **Mouse Emulation** makes ordinary Canvas taps, card dragging, resizing, deselection, and barrel-button right-clicks behave like mouse input.
 - **Pan Mode** uses pen-tip drags to move the Canvas viewport directly.
 
-Enabling Pan Mode switches Mouse Emulation off, and enabling Mouse Emulation switches persistent Pan Mode off. While Mouse Emulation is active, holding the barrel button provides temporary panning without changing either highlighted toolbar action.
+Enabling Pan Mode switches Mouse Emulation off, and enabling Mouse Emulation switches persistent Pan Mode off. In either mode, holding the barrel button before touching Canvas provides temporary panning without changing either highlighted toolbar action.
 
 Specialized embedded targets—active editors, iframes, PDF views, and Excalidraw views—keep native pen input in v1.
 
@@ -32,14 +32,14 @@ Commands are also available:
 - `Tablet Mode: Disable mouse emulation`
 - `Tablet Mode: Toggle pan mode`
 
-With Mouse Emulation enabled:
+Canvas pen controls:
 
-- Pen tip tap/drag uses Canvas mouse behavior.
-- A single barrel click keeps native right-click behavior.
-- A barrel double-click toggles Mouse Emulation.
-- Holding the barrel button before or during tip contact and dragging temporarily pans Canvas while Mouse Emulation remains selected.
+- In Mouse Emulation, a pen-tip tap or drag uses Canvas mouse behavior.
+- One screen tap while holding the barrel button keeps native right-click behavior.
+- Two quick screen taps while holding the barrel button toggle Mouse Emulation.
+- Holding the barrel button before tip contact and dragging temporarily pans Canvas in Native Pen or Mouse Emulation mode.
 
-The first click of a barrel double-click is intentionally not delayed. Its context menu may briefly appear because preserving responsive single-click behavior takes priority.
+Hover-only barrel presses are recognized by Windows but are not exposed to Obsidian as Pointer Events on the tested Surface hardware. The first tap of a contact double-tap is intentionally not delayed, so its context menu may briefly appear because preserving responsive single-tap right-click behavior takes priority.
 
 ## Settings
 

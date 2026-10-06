@@ -24,9 +24,9 @@ Record the Surface model, pen model, Windows version, Obsidian version, and plug
 
 - [ ] Toggle Mouse Emulation through the Canvas view-header action.
 - [ ] Toggle Mouse Emulation through the command palette.
-- [ ] Double barrel-click toggles Mouse Emulation.
-- [ ] Double barrel-click again restores Native Pen Mode.
-- [ ] Double barrel-click while hovering over Canvas toggles Mouse Emulation without requiring tip contact.
+- [ ] Hold the barrel button and tap Canvas twice within 600 ms to enable Mouse Emulation.
+- [ ] Repeat the contact double-tap to restore Native Pen Mode.
+- [ ] The first tap may open its context menu; the second tap suppresses its context menu and toggles the mode.
 - [ ] Notices report command and barrel-gesture state changes.
 - [ ] View-header actions remain synchronized across multiple Canvases and popout windows.
 - [ ] Enabling persistent Pan Mode switches Mouse Emulation off.
@@ -35,13 +35,13 @@ Record the Surface model, pen model, Windows version, Obsidian version, and plug
 ## Temporary panning
 
 - [ ] In Mouse Emulation mode, hold the barrel button before tip contact, touch Canvas, and drag.
-- [ ] While the tip is already touching Canvas, press the barrel button and drag.
+- [ ] Repeat the same temporary barrel drag in Native Pen Mode.
 - [ ] Canvas pans through the temporary direct-pan path.
 - [ ] Mouse Emulation remains visually selected while temporary panning, and the Hand action remains off.
 - [ ] No context menu opens after the pan.
 - [ ] No Canvas card moves during the pan.
 - [ ] Releasing or cancelling the pointer ends panning.
-- [ ] In Native Pen Mode, barrel events remain unmodified.
+- [ ] A Native Pen barrel tap without a drag still opens its context menu.
 - [ ] With Natural pan direction enabled, dragging left pans the view right.
 - [ ] With Natural pan direction disabled, dragging left pans the view left.
 

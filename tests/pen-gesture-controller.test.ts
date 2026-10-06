@@ -21,6 +21,7 @@ describe("PenGestureController", () => {
   let requestEnvironmentSync: ReturnType<typeof vi.fn<() => void>>;
   let state: { tabletModeEnabled: boolean; panModeEnabled: boolean };
   let naturalPanDirection: boolean;
+  let doubleClickIntervalMs: number;
   let debugLogging: boolean;
   let controller: PenGestureController;
 
@@ -35,6 +36,7 @@ describe("PenGestureController", () => {
     requestEnvironmentSync = vi.fn<() => void>();
     state = { tabletModeEnabled: true, panModeEnabled: false };
     naturalPanDirection = true;
+    doubleClickIntervalMs = 600;
     debugLogging = false;
 
     controller = new PenGestureController(window, {
@@ -48,7 +50,7 @@ describe("PenGestureController", () => {
       getSettings: () => ({
         enableTabletModeOnStartup: false,
         enableBarrelDoubleClick: true,
-        doubleClickIntervalMs: 300,
+        doubleClickIntervalMs,
         enableBarrelPan: true,
         panThresholdPx: 5,
         naturalPanDirection,
@@ -108,6 +110,20 @@ describe("PenGestureController", () => {
     expect(toggleTabletMode).toHaveBeenCalledOnce();
   });
 
+  it("recognizes the hardware-validated contact double-tap across pointer IDs", () => {
+    state = { tabletModeEnabled: true, panModeEnabled: false };
+    card.dispatchEvent(pointerEvent("pointerdown", 0, 0, 0, 2, 2, 0.1, "pen", 47));
+    window.dispatchEvent(pointerEvent("pointerup", 80, 0, 0, 2, 0, 0, "pen", 47));
+
+    card.dispatchEvent(pointerEvent("pointerdown", 625, 1, 1, 2, 2, 0.2, "pen", 48));
+    window.dispatchEvent(pointerEvent("pointerup", 690, 1, 1, 2, 0, 0, "pen", 48));
+
+    expect(toggleTabletMode).toHaveBeenCalledOnce();
+    const contextMenu = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    card.dispatchEvent(contextMenu);
+    expect(contextMenu.defaultPrevented).toBe(true);
+  });
+
   it("recognizes barrel double-clicks from hover button-state transitions", () => {
     state = { tabletModeEnabled: false, panModeEnabled: false };
     card.dispatchEvent(pointerEvent("pointermove", 0, 0, 0, -1, 2, 0));
@@ -128,6 +144,20 @@ describe("PenGestureController", () => {
     expect(viewport.tx).toBe(-10);
     expect(viewport.ty).toBe(4);
     expect(viewport.markViewportChanged).toHaveBeenCalled();
+  });
+
+  it("uses contact barrel-drag panning in Native Pen mode", () => {
+    state = { tabletModeEnabled: false, panModeEnabled: false };
+    card.dispatchEvent(pointerEvent("pointerdown", 0, 0, 0, 2, 2, 0.1));
+    window.dispatchEvent(pointerEvent("pointermove", 100, -12, 6, -1, 2, 0.2));
+    window.dispatchEvent(pointerEvent("pointerup", 120, -12, 6, 2, 0, 0));
+
+    expect(viewport.tx).toBe(12);
+    expect(viewport.ty).toBe(-6);
+
+    const contextMenu = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    card.dispatchEvent(contextMenu);
+    expect(contextMenu.defaultPrevented).toBe(true);
   });
 
   it("starts temporary panning when the barrel button is pressed during contact", () => {
@@ -216,10 +246,11 @@ function pointerEvent(
   rawButtons: number,
   pressure = 0.5,
   rawPointerType = "pen",
+  pointerId = 9,
 ): TestPointerEvent {
   const event = new Event(type, { bubbles: true, cancelable: true }) as TestPointerEvent;
   const properties = {
-    pointerId: 9,
+    pointerId,
     timeStamp: timestamp,
     clientX,
     clientY,

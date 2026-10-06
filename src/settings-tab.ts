@@ -37,8 +37,10 @@ export class SurfaceTabletSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Double-click pen side button")
-      .setDesc("Double-click the Surface Pen barrel button in Canvas to toggle mouse emulation.")
+      .setName("Double-tap with pen side button")
+      .setDesc(
+        "Hold the Surface Pen barrel button and tap Canvas twice to toggle mouse emulation. Hover-only button presses are not exposed to Obsidian on the tested hardware.",
+      )
       .addToggle((toggle) =>
         toggle.setValue(this.host.settings.enableBarrelDoubleClick).onChange(async (value) => {
           this.host.settings.enableBarrelDoubleClick = value;
@@ -47,8 +49,8 @@ export class SurfaceTabletSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Double-click interval")
-      .setDesc("Maximum time between barrel clicks.")
+      .setName("Double-tap interval")
+      .setDesc("Maximum time from the first barrel-assisted tap ending to the second starting.")
       .addSlider((slider) =>
         slider
           .setLimits(200, 600, 25)
@@ -63,7 +65,7 @@ export class SurfaceTabletSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Hold pen side button to pan")
       .setDesc(
-        "In Mouse Emulation mode, hold the barrel button and drag for temporary Canvas panning.",
+        "In Native Pen or Mouse Emulation mode, hold the barrel button before touching Canvas, then drag to pan temporarily.",
       )
       .addToggle((toggle) =>
         toggle.setValue(this.host.settings.enableBarrelPan).onChange(async (value) => {

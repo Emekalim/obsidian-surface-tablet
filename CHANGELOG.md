@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+
+- Enabled temporary barrel-drag panning in Native Pen mode as well as Mouse Emulation mode.
+- Set the default contact double-tap interval to 600 ms based on Surface hardware traces.
+- Documented the hardware-validated toggle gesture: hold the barrel button and tap Canvas twice.
+- Preserved single barrel-assisted tap right-click behavior and second-tap context-menu suppression.
+- Added regression coverage replaying distinct Surface pen pointer IDs and observed timing.
+
 ## 0.3.1
 
 - Added an opt-in raw Canvas pointer-event diagnostic buffer for Surface hardware investigation.
