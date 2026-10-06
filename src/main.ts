@@ -1,6 +1,7 @@
 import { Notice, Platform, Plugin } from "obsidian";
 import { CanvasTargetRegistry } from "./canvas-target-registry";
 import { CanvasToolbarController } from "./canvas-toolbar-controller";
+import { CanvasPanController } from "./canvas-pan-controller";
 import { SurfaceTabletModeState } from "./mode-state";
 import { PenGestureController } from "./pen-gesture-controller";
 import { WindowPointerPatch } from "./pointer-type-override";
@@ -20,6 +21,7 @@ export default class SurfaceTabletPlugin extends Plugin {
 
   private modeState!: SurfaceTabletModeState;
   private readonly canvasTargets = new CanvasTargetRegistry();
+  private readonly panController = new CanvasPanController();
   private canvasToolbar: CanvasToolbarController | null = null;
   private readonly windowRuntimes = new Map<Window, WindowRuntime>();
   private readonly failedWindows = new WeakSet<Window>();
@@ -125,6 +127,21 @@ export default class SurfaceTabletPlugin extends Plugin {
         runtime.gestures.destroy();
         runtime.patch.uninstall();
         this.windowRuntimes.delete(ownerWindow);
+      } else if (!runtime.patch.isIntact()) {
+        try {
+          runtime.patch.install();
+          this.debug("Reinstalled input handling after window lifecycle change");
+        } catch (error) {
+          runtime.gestures.destroy();
+          runtime.patch.uninstall();
+          this.windowRuntimes.delete(ownerWindow);
+          this.failedWindows.add(ownerWindow);
+          this.reportError(
+            "Could not restore input handling after a window lifecycle change",
+            error,
+          );
+          new Notice("Surface Tablet: Input emulation could not be restored in this window.");
+        }
       }
     }
 
@@ -141,20 +158,24 @@ export default class SurfaceTabletPlugin extends Plugin {
   }
 
   private installWindow(ownerWindow: Window): void {
+    let gestures: PenGestureController | null = null;
     const patch = new WindowPointerPatch(ownerWindow, {
       canvasTargets: this.canvasTargets,
+      isActiveCanvasPointer: (event) => gestures?.isActiveCanvasPointer(event) ?? false,
       getModeState: () => this.modeState.snapshot(),
       onError: (message, error) => this.reportError(message, error),
     });
 
     try {
       patch.install();
-      const gestures = new PenGestureController(ownerWindow, {
+      gestures = new PenGestureController(ownerWindow, {
         pointerPatch: patch,
         canvasTargets: this.canvasTargets,
+        panController: this.panController,
         getSettings: () => this.settings,
         getModeState: () => this.modeState.snapshot(),
         toggleTabletMode: () => this.toggleTabletMode("pen"),
+        requestEnvironmentSync: this.queueEnvironmentSync,
         debug: (message, details) => this.debug(message, details),
       });
       this.windowRuntimes.set(ownerWindow, { patch, gestures });

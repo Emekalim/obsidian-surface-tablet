@@ -18,10 +18,13 @@ export class SurfaceTabletModeState {
   }
 
   setTabletMode(enabled: boolean): boolean {
-    if (this.state.tabletModeEnabled === enabled) {
+    if (this.state.tabletModeEnabled === enabled && (!enabled || !this.state.panModeEnabled)) {
       return false;
     }
-    this.state = { ...this.state, tabletModeEnabled: enabled };
+    this.state = {
+      tabletModeEnabled: enabled,
+      panModeEnabled: enabled ? false : this.state.panModeEnabled,
+    };
     this.notify();
     return true;
   }
@@ -32,10 +35,13 @@ export class SurfaceTabletModeState {
   }
 
   setPanMode(enabled: boolean): boolean {
-    if (this.state.panModeEnabled === enabled) {
+    if (this.state.panModeEnabled === enabled && (!enabled || !this.state.tabletModeEnabled)) {
       return false;
     }
-    this.state = { ...this.state, panModeEnabled: enabled };
+    this.state = {
+      tabletModeEnabled: enabled ? false : this.state.tabletModeEnabled,
+      panModeEnabled: enabled,
+    };
     this.notify();
     return true;
   }

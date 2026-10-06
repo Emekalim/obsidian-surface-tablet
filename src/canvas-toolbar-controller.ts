@@ -1,4 +1,5 @@
 import { FileView, getIconIds, setIcon, type App } from "obsidian";
+import type { CanvasViewport } from "./canvas-pan-controller";
 import type { CanvasTargetRegistry } from "./canvas-target-registry";
 import type { SurfaceTabletModeSnapshot } from "./mode-state";
 
@@ -28,7 +29,12 @@ export class CanvasToolbarController {
 
   sync(): void {
     const views = this.findCanvasViews();
-    this.canvasTargets.replaceRoots([...views].map((view) => view.contentEl));
+    this.canvasTargets.replaceTargets(
+      [...views].map((view) => ({
+        root: view.contentEl,
+        getViewport: () => getCanvasViewport(view),
+      })),
+    );
 
     for (const [view, controls] of this.controls) {
       if (!views.has(view) || !this.shouldRenderControls()) {
@@ -121,4 +127,17 @@ export class CanvasToolbarController {
   private icon(preferred: string, fallback: string): string {
     return this.availableIcons.has(preferred) ? preferred : fallback;
   }
+}
+
+function getCanvasViewport(view: FileView): CanvasViewport | null {
+  const canvas = (view as FileView & { canvas?: Partial<CanvasViewport> }).canvas;
+  if (
+    !canvas ||
+    typeof canvas.tx !== "number" ||
+    typeof canvas.ty !== "number" ||
+    typeof canvas.markViewportChanged !== "function"
+  ) {
+    return null;
+  }
+  return canvas as CanvasViewport;
 }

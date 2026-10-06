@@ -9,10 +9,12 @@ Surface Tablet is an Obsidian desktop plugin that makes Canvas usable with a Sur
 
 In Tablet Mode, Surface Tablet changes only the `pointerType` reported for eligible pen events inside Canvas from `pen` to `mouse`. It preserves the event's coordinates, pressure, pointer ID, tilt, and button state. Mouse and touch input are left unchanged.
 
-The plugin provides two independent session modes:
+The plugin provides two mutually exclusive persistent session modes:
 
 - **Mouse Emulation** makes ordinary Canvas taps, card dragging, resizing, deselection, and barrel-button right-clicks behave like mouse input.
-- **Pan Mode** presents pen-tip drags as middle-button drags so Canvas can use its native panning behavior.
+- **Pan Mode** uses pen-tip drags to move the Canvas viewport directly.
+
+Enabling Pan Mode switches Mouse Emulation off, and enabling Mouse Emulation switches persistent Pan Mode off. While Mouse Emulation is active, holding the barrel button provides temporary panning without changing either highlighted toolbar action.
 
 Specialized embedded targets—active editors, iframes, PDF views, and Excalidraw views—keep native pen input in v1.
 
@@ -35,7 +37,7 @@ With Mouse Emulation enabled:
 - Pen tip tap/drag uses Canvas mouse behavior.
 - A single barrel click keeps native right-click behavior.
 - A barrel double-click toggles Mouse Emulation.
-- Holding the barrel button and dragging uses Canvas native right-drag panning.
+- Holding the barrel button and dragging temporarily pans Canvas while Mouse Emulation remains selected.
 
 The first click of a barrel double-click is intentionally not delayed. Its context menu may briefly appear because preserving responsive single-click behavior takes priority.
 
@@ -75,6 +77,7 @@ The implementation is split into independently testable pieces:
 - `WindowPointerPatch` installs and safely restores per-window event accessors.
 - `BarrelGestureMachine` classifies single clicks, double-clicks, and drags.
 - `PenGestureController` connects raw pointer events to the state machine.
+- `CanvasPanController` applies feature-detected Canvas viewport movement.
 - `CanvasToolbarController` discovers Canvas views and manages view-header controls.
 - `CanvasTargetRegistry` limits transformations to eligible Canvas targets.
 
@@ -85,6 +88,7 @@ The implementation is split into independently testable pieces:
 - A descriptor is restored only when Surface Tablet's own getter is still installed.
 - If another plugin wraps a Surface Tablet getter, it becomes a transparent pass-through after unload instead of overwriting the other plugin.
 - If a complete safe patch cannot be installed, that window fails closed and input remains native.
+- Focus and visibility restoration refresh Canvas roots and verify that event getters are still installed.
 - No telemetry is collected. Debug output stays in the local developer console.
 
 ## Hardware validation status

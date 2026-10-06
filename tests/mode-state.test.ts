@@ -7,12 +7,20 @@ describe("SurfaceTabletModeState", () => {
     expect(state.snapshot()).toEqual({ tabletModeEnabled: true, panModeEnabled: false });
   });
 
-  it("keeps Tablet and Pan modes independent", () => {
+  it("does not enable the other mode when the current mode is disabled", () => {
     const state = new SurfaceTabletModeState(false);
     state.setPanMode(true);
-    state.setTabletMode(true);
-    state.setTabletMode(false);
+    state.setPanMode(false);
+    expect(state.snapshot()).toEqual({ tabletModeEnabled: false, panModeEnabled: false });
+  });
+
+  it("never leaves persistent Pan Mode and Mouse Emulation enabled together", () => {
+    const state = new SurfaceTabletModeState(true);
+    state.setPanMode(true);
     expect(state.snapshot()).toEqual({ tabletModeEnabled: false, panModeEnabled: true });
+
+    state.setTabletMode(true);
+    expect(state.snapshot()).toEqual({ tabletModeEnabled: true, panModeEnabled: false });
   });
 
   it("notifies subscribers only on changes", () => {

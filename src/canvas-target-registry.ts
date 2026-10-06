@@ -1,3 +1,5 @@
+import type { CanvasViewport } from "./canvas-pan-controller";
+
 const NATIVE_PEN_TARGET_SELECTOR = [
   "input",
   "textarea",
@@ -19,19 +21,25 @@ const NATIVE_PEN_TARGET_SELECTOR = [
 
 /** Tracks the public content roots of loaded Canvas FileViews. */
 export class CanvasTargetRegistry {
-  private roots = new Set<HTMLElement>();
+  private registrations = new Map<HTMLElement, () => CanvasViewport | null>();
 
   replaceRoots(roots: Iterable<HTMLElement>): void {
-    this.roots = new Set(roots);
+    this.registrations = new Map([...roots].map((root) => [root, () => null]));
+  }
+
+  replaceTargets(
+    targets: Iterable<{ root: HTMLElement; getViewport: () => CanvasViewport | null }>,
+  ): void {
+    this.registrations = new Map([...targets].map(({ root, getViewport }) => [root, getViewport]));
   }
 
   clear(): void {
-    this.roots.clear();
+    this.registrations.clear();
   }
 
   getWindows(): Set<Window> {
     const windows = new Set<Window>();
-    for (const root of this.roots) {
+    for (const root of this.registrations.keys()) {
       const ownerWindow = root.ownerDocument.defaultView;
       if (ownerWindow) {
         windows.add(ownerWindow);
@@ -55,10 +63,24 @@ export class CanvasTargetRegistry {
     return !nativeTarget || !root.contains(nativeTarget);
   }
 
+  getViewportForEvent(event: Event): CanvasViewport | null {
+    const element = eventOriginElement(event);
+    if (!element) {
+      return null;
+    }
+    return this.findContainingRegistration(element)?.getViewport() ?? null;
+  }
+
   private findContainingRoot(node: Node): HTMLElement | null {
-    for (const root of this.roots) {
+    return this.findContainingRegistration(node)?.root ?? null;
+  }
+
+  private findContainingRegistration(
+    node: Node,
+  ): { root: HTMLElement; getViewport: () => CanvasViewport | null } | null {
+    for (const [root, getViewport] of this.registrations) {
       if (root === node || root.contains(node)) {
-        return root;
+        return { root, getViewport };
       }
     }
     return null;

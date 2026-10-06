@@ -63,7 +63,7 @@ export class SurfaceTabletSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Hold pen side button to pan")
       .setDesc(
-        "In Tablet Mode, hold the barrel button and drag to use Canvas native right-drag panning.",
+        "In Mouse Emulation mode, hold the barrel button and drag for temporary Canvas panning.",
       )
       .addToggle((toggle) =>
         toggle.setValue(this.host.settings.enableBarrelPan).onChange(async (value) => {

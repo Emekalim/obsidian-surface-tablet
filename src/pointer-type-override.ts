@@ -16,6 +16,7 @@ interface InstalledProperty {
 
 export interface PointerPatchDependencies {
   canvasTargets: CanvasTargetRegistry;
+  isActiveCanvasPointer: (event: PointerEvent) => boolean;
   getModeState: () => Readonly<SurfaceTabletModeSnapshot>;
   onError: (message: string, error?: unknown) => void;
 }
@@ -42,8 +43,12 @@ export class WindowPointerPatch {
   }
 
   install(): void {
-    if (this.active) {
+    if (this.isIntact()) {
       return;
+    }
+    if (this.active) {
+      this.active = false;
+      this.restoreOwnedGetters();
     }
 
     const snapshots = new Map<PatchedProperty, DescriptorSnapshot>();
@@ -64,19 +69,11 @@ export class WindowPointerPatch {
     };
 
     const buttonGetter: Getter = function (this: PointerEvent): number {
-      const actual = Number(rawButton.call(this));
-      if (!patchShouldPanTip(this) || actual !== 0) {
-        return actual;
-      }
-      return 1;
+      return Number(rawButton.call(this));
     };
 
     const buttonsGetter: Getter = function (this: PointerEvent): number {
-      const actual = Number(rawButtons.call(this));
-      if (!patchShouldPanTip(this) || actual !== 1) {
-        return actual;
-      }
-      return 4;
+      return Number(rawButtons.call(this));
     };
 
     const dependencies = this.dependencies;
@@ -88,19 +85,10 @@ export class WindowPointerPatch {
       }
       const mode = dependencies.getModeState();
       return (
-        (mode.tabletModeEnabled || mode.panModeEnabled) &&
-        dependencies.canvasTargets.isEligibleCanvasEvent(event)
+        mode.tabletModeEnabled &&
+        (dependencies.canvasTargets.isEligibleCanvasEvent(event) ||
+          dependencies.isActiveCanvasPointer(event))
       );
-    }
-
-    function patchShouldPanTip(event: PointerEvent): boolean {
-      if (!isActive() || !dependencies.getModeState().panModeEnabled) {
-        return false;
-      }
-      if (String(rawPointerType.call(event)) !== "pen") {
-        return false;
-      }
-      return dependencies.canvasTargets.isEligibleCanvasEvent(event);
     }
 
     const getters: Record<PatchedProperty, Getter> = {
@@ -134,6 +122,18 @@ export class WindowPointerPatch {
   uninstall(): void {
     this.active = false;
     this.restoreOwnedGetters();
+  }
+
+  isIntact(): boolean {
+    if (!this.active || this.installed.size !== 3) {
+      return false;
+    }
+    for (const [property, installed] of this.installed) {
+      if (Object.getOwnPropertyDescriptor(this.prototype, property)?.get !== installed.getter) {
+        return false;
+      }
+    }
+    return true;
   }
 
   readRawPointerType(event: PointerEvent): string {

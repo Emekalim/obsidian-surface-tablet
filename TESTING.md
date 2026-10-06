@@ -28,11 +28,14 @@ Record the Surface model, pen model, Windows version, Obsidian version, and plug
 - [ ] Double barrel-click again restores Native Pen Mode.
 - [ ] Notices report command and barrel-gesture state changes.
 - [ ] View-header actions remain synchronized across multiple Canvases and popout windows.
+- [ ] Enabling persistent Pan Mode switches Mouse Emulation off.
+- [ ] Enabling Mouse Emulation switches persistent Pan Mode off.
 
 ## Temporary panning
 
 - [ ] In Mouse Emulation mode, hold the barrel button and drag blank Canvas.
-- [ ] Canvas pans using native right-drag behavior.
+- [ ] Canvas pans through the temporary direct-pan path.
+- [ ] Mouse Emulation remains visually selected while temporary panning, and the Hand action remains off.
 - [ ] No context menu opens after the pan.
 - [ ] No Canvas card moves during the pan.
 - [ ] Releasing or cancelling the pointer ends panning.
@@ -55,4 +58,6 @@ Record the Surface model, pen model, Windows version, Obsidian version, and plug
 - [ ] Event listeners are removed.
 - [ ] Re-enable the plugin and confirm controls are not duplicated.
 - [ ] Open and close a Canvas popout and confirm its descriptors are installed and restored independently.
+- [ ] Minimize and restore Obsidian, then verify card dragging and resizing still work.
+- [ ] Minimize and restore Obsidian with Pan Mode selected, then verify pen-tip panning still works.
 - [ ] Enable debug logging only while collecting diagnostics; confirm pointer moves are not continuously logged.

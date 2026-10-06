@@ -17,12 +17,12 @@ class FakeMouseEvent {
 }
 
 class FakePointerEvent extends FakeMouseEvent {
-  readonly target = {};
-
   constructor(
     private readonly nativePointerType: string,
     button: number,
     buttons: number,
+    readonly target: object = {},
+    readonly pointerId = 1,
   ) {
     super(button, buttons);
   }
@@ -52,6 +52,7 @@ describe("WindowPointerPatch", () => {
     const state = { tabletModeEnabled: true, panModeEnabled: false };
     const patch = new WindowPointerPatch(fakeWindow(), {
       canvasTargets: { isEligibleCanvasEvent: () => true } as never,
+      isActiveCanvasPointer: () => false,
       getModeState: () => state,
       onError: vi.fn(),
     });
@@ -68,10 +69,11 @@ describe("WindowPointerPatch", () => {
     expect(pen.pointerType).toBe("pen");
   });
 
-  it("maps a pen tip to middle-button semantics only in Pan Mode", () => {
+  it("leaves pen properties native in persistent Pan Mode for the direct pan controller", () => {
     const state = { tabletModeEnabled: false, panModeEnabled: true };
     const patch = new WindowPointerPatch(fakeWindow(), {
       canvasTargets: { isEligibleCanvasEvent: () => true } as never,
+      isActiveCanvasPointer: () => false,
       getModeState: () => state,
       onError: vi.fn(),
     });
@@ -79,9 +81,9 @@ describe("WindowPointerPatch", () => {
 
     const tip = new FakePointerEvent("pen", 0, 1) as unknown as PointerEvent;
     const barrel = new FakePointerEvent("pen", 2, 2) as unknown as PointerEvent;
-    expect(tip.pointerType).toBe("mouse");
-    expect(tip.button).toBe(1);
-    expect(tip.buttons).toBe(4);
+    expect(tip.pointerType).toBe("pen");
+    expect(tip.button).toBe(0);
+    expect(tip.buttons).toBe(1);
     expect(barrel.button).toBe(2);
     expect(barrel.buttons).toBe(2);
 
@@ -91,6 +93,7 @@ describe("WindowPointerPatch", () => {
   it("leaves ineligible Canvas targets native", () => {
     const patch = new WindowPointerPatch(fakeWindow(), {
       canvasTargets: { isEligibleCanvasEvent: () => false } as never,
+      isActiveCanvasPointer: () => false,
       getModeState: () => ({ tabletModeEnabled: true, panModeEnabled: true }),
       onError: vi.fn(),
     });
@@ -106,6 +109,7 @@ describe("WindowPointerPatch", () => {
     const ownerWindow = fakeWindow();
     const patch = new WindowPointerPatch(ownerWindow, {
       canvasTargets: { isEligibleCanvasEvent: () => true } as never,
+      isActiveCanvasPointer: () => false,
       getModeState: () => ({ tabletModeEnabled: true, panModeEnabled: false }),
       onError: vi.fn(),
     });
@@ -127,5 +131,47 @@ describe("WindowPointerPatch", () => {
     expect(Object.getOwnPropertyDescriptor(prototype, "pointerType")?.get).toBe(laterGetter);
     const event = new FakePointerEvent("pen", 0, 1) as unknown as PointerEvent;
     expect(event.pointerType).toBe("pen");
+  });
+
+  it("keeps an active Canvas pointer mouse-like when a drag event is retargeted", () => {
+    const canvasTarget = {};
+    const outsideTarget = {};
+    const patch = new WindowPointerPatch(fakeWindow(), {
+      canvasTargets: {
+        isEligibleCanvasEvent: (event: PointerEvent) => event.target === canvasTarget,
+      } as never,
+      isActiveCanvasPointer: (event: PointerEvent) => event.pointerId === 42,
+      getModeState: () => ({ tabletModeEnabled: true, panModeEnabled: false }),
+      onError: vi.fn(),
+    } as never);
+    patch.install();
+
+    const down = new FakePointerEvent("pen", 0, 1, canvasTarget, 42) as unknown as PointerEvent;
+    const move = new FakePointerEvent("pen", -1, 1, outsideTarget, 42) as unknown as PointerEvent;
+    expect(down.pointerType).toBe("mouse");
+    expect(move.pointerType).toBe("mouse");
+    patch.uninstall();
+  });
+
+  it("can reinstall after its getter is replaced during a window lifecycle transition", () => {
+    const ownerWindow = fakeWindow();
+    const patch = new WindowPointerPatch(ownerWindow, {
+      canvasTargets: { isEligibleCanvasEvent: () => true } as never,
+      isActiveCanvasPointer: () => false,
+      getModeState: () => ({ tabletModeEnabled: true, panModeEnabled: false }),
+      onError: vi.fn(),
+    });
+    patch.install();
+
+    const prototype = (ownerWindow as Window & { PointerEvent: typeof PointerEvent }).PointerEvent
+      .prototype;
+    if (originalPointerTypeDescriptor) {
+      Object.defineProperty(prototype, "pointerType", originalPointerTypeDescriptor);
+    }
+
+    patch.install();
+    const event = new FakePointerEvent("pen", 0, 1) as unknown as PointerEvent;
+    expect(event.pointerType).toBe("mouse");
+    patch.uninstall();
   });
 });
