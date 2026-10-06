@@ -1,0 +1,10 @@
+{
+  "id": "surface-tablet",
+  "name": "Surface Tablet",
+  "version": "0.1.0",
+  "minAppVersion": "1.14.0",
+  "description": "Adds Windows Surface Pen controls to Canvas, including mouse emulation and pen-based panning.",
+  "author": "Emekalim",
+  "authorUrl": "https://github.com/Emekalim",
+  "isDesktopOnly": true
+}

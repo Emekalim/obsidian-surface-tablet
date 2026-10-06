@@ -1,0 +1,111 @@
+import { PluginSettingTab, Setting, type App, type Plugin } from "obsidian";
+import type { SurfaceTabletSettings } from "./settings";
+
+export interface SurfaceTabletSettingsHost {
+  settings: SurfaceTabletSettings;
+  supportedPlatform: boolean;
+  saveSettings: () => Promise<void>;
+}
+
+export class SurfaceTabletSettingTab extends PluginSettingTab {
+  constructor(
+    app: App,
+    private readonly host: SurfaceTabletSettingsHost & Plugin,
+  ) {
+    super(app, host);
+  }
+
+  override display(): void {
+    const { containerEl } = this;
+    containerEl.empty();
+
+    containerEl.createEl("h2", { text: "Surface Tablet" });
+    containerEl.createEl("p", {
+      text: this.host.supportedPlatform
+        ? "Surface Pen controls for Obsidian Canvas on Windows. Runtime mode changes last for the current session only."
+        : "Surface Tablet v1 supports Obsidian Desktop on Windows. Input controls remain inactive on this operating system.",
+    });
+
+    new Setting(containerEl)
+      .setName("Enable Tablet Mode automatically")
+      .setDesc("Start each Obsidian session with Canvas pen-to-mouse emulation enabled.")
+      .addToggle((toggle) =>
+        toggle.setValue(this.host.settings.enableTabletModeOnStartup).onChange(async (value) => {
+          this.host.settings.enableTabletModeOnStartup = value;
+          await this.host.saveSettings();
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName("Double-click pen side button")
+      .setDesc("Double-click the Surface Pen barrel button in Canvas to toggle mouse emulation.")
+      .addToggle((toggle) =>
+        toggle.setValue(this.host.settings.enableBarrelDoubleClick).onChange(async (value) => {
+          this.host.settings.enableBarrelDoubleClick = value;
+          await this.host.saveSettings();
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName("Double-click interval")
+      .setDesc("Maximum time between barrel clicks.")
+      .addSlider((slider) =>
+        slider
+          .setLimits(200, 600, 25)
+          .setValue(this.host.settings.doubleClickIntervalMs)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.host.settings.doubleClickIntervalMs = value;
+            await this.host.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Hold pen side button to pan")
+      .setDesc(
+        "In Tablet Mode, hold the barrel button and drag to use Canvas native right-drag panning.",
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(this.host.settings.enableBarrelPan).onChange(async (value) => {
+          this.host.settings.enableBarrelPan = value;
+          await this.host.saveSettings();
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName("Pan movement threshold")
+      .setDesc("Movement required before a barrel gesture is classified as a pan, in CSS pixels.")
+      .addSlider((slider) =>
+        slider
+          .setLimits(2, 20, 1)
+          .setValue(this.host.settings.panThresholdPx)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.host.settings.panThresholdPx = value;
+            await this.host.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Show Canvas controls")
+      .setDesc("Show mouse-emulation and Pan Mode actions in each Canvas view header.")
+      .addToggle((toggle) =>
+        toggle.setValue(this.host.settings.showCanvasControls).onChange(async (value) => {
+          this.host.settings.showCanvasControls = value;
+          await this.host.saveSettings();
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName("Debug logging")
+      .setDesc(
+        "Log pen gesture details to the developer console. Pointer moves are logged only at gesture transitions.",
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(this.host.settings.debugLogging).onChange(async (value) => {
+          this.host.settings.debugLogging = value;
+          await this.host.saveSettings();
+        }),
+      );
+  }
+}
