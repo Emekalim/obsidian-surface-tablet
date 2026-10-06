@@ -20,6 +20,7 @@ describe("PenGestureController", () => {
   let toggleTabletMode: ReturnType<typeof vi.fn<() => void>>;
   let requestEnvironmentSync: ReturnType<typeof vi.fn<() => void>>;
   let state: { tabletModeEnabled: boolean; panModeEnabled: boolean };
+  let naturalPanDirection: boolean;
   let controller: PenGestureController;
 
   beforeEach(() => {
@@ -32,6 +33,7 @@ describe("PenGestureController", () => {
     toggleTabletMode = vi.fn<() => void>();
     requestEnvironmentSync = vi.fn<() => void>();
     state = { tabletModeEnabled: true, panModeEnabled: false };
+    naturalPanDirection = true;
 
     controller = new PenGestureController(window, {
       pointerPatch: {
@@ -47,6 +49,7 @@ describe("PenGestureController", () => {
         doubleClickIntervalMs: 300,
         enableBarrelPan: true,
         panThresholdPx: 5,
+        naturalPanDirection,
         showCanvasControls: true,
         debugLogging: false,
       }),
@@ -64,12 +67,23 @@ describe("PenGestureController", () => {
     window.dispatchEvent(pointerEvent("pointermove", 100, 10, -4, -1, 2));
     window.dispatchEvent(pointerEvent("pointerup", 120, 10, -4, 2, 0));
 
-    expect(viewport.tx).toBe(10);
-    expect(viewport.ty).toBe(-4);
+    expect(viewport.tx).toBe(-10);
+    expect(viewport.ty).toBe(4);
     expect(viewport.markViewportChanged).toHaveBeenCalled();
   });
 
   it("directly pans with the pen tip in persistent Pan Mode", () => {
+    state = { tabletModeEnabled: false, panModeEnabled: true };
+    card.dispatchEvent(pointerEvent("pointerdown", 0, 0, 0, 0, 1));
+    window.dispatchEvent(pointerEvent("pointermove", 20, 8, 3, -1, 1));
+    window.dispatchEvent(pointerEvent("pointerup", 30, 8, 3, 0, 0));
+
+    expect(viewport.tx).toBe(-8);
+    expect(viewport.ty).toBe(-3);
+  });
+
+  it("keeps the previous direct pan direction when natural panning is disabled", () => {
+    naturalPanDirection = false;
     state = { tabletModeEnabled: false, panModeEnabled: true };
     card.dispatchEvent(pointerEvent("pointerdown", 0, 0, 0, 0, 1));
     window.dispatchEvent(pointerEvent("pointermove", 20, 8, 3, -1, 1));
@@ -92,6 +106,61 @@ describe("PenGestureController", () => {
     expect(toggleTabletMode).toHaveBeenCalledOnce();
   });
 
+  it("recognizes barrel double-clicks from hover button-state transitions", () => {
+    state = { tabletModeEnabled: false, panModeEnabled: false };
+    card.dispatchEvent(pointerEvent("pointermove", 0, 0, 0, -1, 2, 0));
+    card.dispatchEvent(pointerEvent("pointermove", 20, 0, 0, -1, 0, 0));
+    card.dispatchEvent(pointerEvent("pointermove", 150, 0, 0, -1, 2, 0));
+    card.dispatchEvent(pointerEvent("pointermove", 170, 0, 0, -1, 0, 0));
+
+    expect(toggleTabletMode).toHaveBeenCalledOnce();
+  });
+
+  it("uses a barrel hold recognized before contact for temporary panning", () => {
+    card.dispatchEvent(pointerEvent("pointermove", 0, 0, 0, -1, 2, 0));
+    card.dispatchEvent(pointerEvent("pointerdown", 20, 0, 0, 0, 2, 0.5));
+    window.dispatchEvent(pointerEvent("pointermove", 120, 10, -4, -1, 2, 0.5));
+    window.dispatchEvent(pointerEvent("pointerup", 140, 10, -4, 0, 2, 0));
+    card.dispatchEvent(pointerEvent("pointermove", 160, 10, -4, -1, 0, 0));
+
+    expect(viewport.tx).toBe(-10);
+    expect(viewport.ty).toBe(4);
+    expect(viewport.markViewportChanged).toHaveBeenCalled();
+  });
+
+  it("starts temporary panning when the barrel button is pressed during contact", () => {
+    card.dispatchEvent(pointerEvent("pointerdown", 0, 0, 0, 0, 1, 0.5));
+    card.dispatchEvent(pointerEvent("pointermove", 20, 0, 0, -1, 3, 0.5));
+    window.dispatchEvent(pointerEvent("pointermove", 120, 12, 5, -1, 3, 0.5));
+    window.dispatchEvent(pointerEvent("pointerup", 140, 12, 5, 0, 0, 0));
+
+    expect(viewport.tx).toBe(-12);
+    expect(viewport.ty).toBe(-5);
+  });
+
+  it("does not count a completed barrel pan as a double-click", () => {
+    card.dispatchEvent(pointerEvent("pointerdown", 0, 0, 0, 2, 2));
+    window.dispatchEvent(pointerEvent("pointermove", 100, 10, 0, -1, 2));
+    window.dispatchEvent(pointerEvent("pointerup", 120, 10, 0, 2, 0));
+
+    card.dispatchEvent(pointerEvent("pointermove", 200, 10, 0, -1, 2, 0));
+    card.dispatchEvent(pointerEvent("pointermove", 220, 10, 0, -1, 0, 0));
+
+    expect(toggleTabletMode).not.toHaveBeenCalled();
+  });
+
+  it("does not reuse a hovered Canvas viewport for contact outside Canvas", () => {
+    const outside = document.createElement("div");
+    document.body.append(outside);
+    card.dispatchEvent(pointerEvent("pointermove", 0, 0, 0, -1, 0, 0));
+    outside.dispatchEvent(pointerEvent("pointermove", 20, 0, 0, -1, 2, 0.5));
+    outside.dispatchEvent(pointerEvent("pointermove", 120, 12, 5, -1, 2, 0.5));
+    outside.dispatchEvent(pointerEvent("pointerup", 140, 12, 5, 2, 0, 0));
+
+    expect(viewport.tx).toBe(0);
+    expect(viewport.ty).toBe(0);
+  });
+
   it("requests a lifecycle refresh when the Obsidian window regains focus", () => {
     window.dispatchEvent(new Event("focus"));
     expect(requestEnvironmentSync).toHaveBeenCalledOnce();
@@ -105,6 +174,7 @@ function pointerEvent(
   clientY: number,
   rawButton: number,
   rawButtons: number,
+  pressure = 0.5,
 ): TestPointerEvent {
   const event = new Event(type, { bubbles: true, cancelable: true }) as TestPointerEvent;
   const properties = {
@@ -112,7 +182,7 @@ function pointerEvent(
     timeStamp: timestamp,
     clientX,
     clientY,
-    pressure: 0.5,
+    pressure,
     rawPointerType: "pen",
     rawButton,
     rawButtons,

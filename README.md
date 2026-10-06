@@ -3,7 +3,7 @@
 Surface Tablet is an Obsidian desktop plugin that makes Canvas usable with a Surface Pen by presenting supported pen interactions to Canvas as mouse interactions.
 
 > [!IMPORTANT]
-> Version 0.1 is designed for **Obsidian Desktop on Windows** and is awaiting validation on physical Surface hardware. macOS, Linux, mobile, and non-Surface pens are not supported yet.
+> Version 0.3 is designed for **Obsidian Desktop on Windows** and is being validated with a Microsoft Surface Pen. macOS, Linux, mobile, and non-Surface pens are not supported yet.
 
 ## What it does
 
@@ -37,7 +37,7 @@ With Mouse Emulation enabled:
 - Pen tip tap/drag uses Canvas mouse behavior.
 - A single barrel click keeps native right-click behavior.
 - A barrel double-click toggles Mouse Emulation.
-- Holding the barrel button and dragging temporarily pans Canvas while Mouse Emulation remains selected.
+- Holding the barrel button before or during tip contact and dragging temporarily pans Canvas while Mouse Emulation remains selected.
 
 The first click of a barrel double-click is intentionally not delayed. Its context menu may briefly appear because preserving responsive single-click behavior takes priority.
 
@@ -48,6 +48,7 @@ Surface Tablet includes settings for:
 - Startup Mouse Emulation state
 - Barrel double-click toggle and interval
 - Barrel-drag panning and movement threshold
+- Natural (opposite-direction) or direct (same-direction) panning
 - Canvas view-header controls
 - Diagnostic logging
 
@@ -93,7 +94,7 @@ The implementation is split into independently testable pieces:
 
 ## Hardware validation status
 
-Designed for Windows Surface devices; physical hardware validation is pending. The repository will remain private and versioned below 1.0 until the complete manual test matrix passes on an identified Surface and pen model.
+Designed for Windows Surface devices and currently tested with a Microsoft Surface Pen. The repository will remain private and versioned below 1.0 until the complete manual test matrix passes on an identified Surface and pen model.
 
 See [TESTING.md](TESTING.md) for the validation checklist.
 

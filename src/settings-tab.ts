@@ -87,6 +87,18 @@ export class SurfaceTabletSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("Natural pan direction")
+      .setDesc(
+        "Move the Canvas opposite the pen drag, like swiping a physical surface. Turn this off to move the Canvas in the same direction as the pen.",
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(this.host.settings.naturalPanDirection).onChange(async (value) => {
+          this.host.settings.naturalPanDirection = value;
+          await this.host.saveSettings();
+        }),
+      );
+
+    new Setting(containerEl)
       .setName("Show Canvas controls")
       .setDesc("Show mouse-emulation and Pan Mode actions in each Canvas view header.")
       .addToggle((toggle) =>

@@ -4,6 +4,7 @@ export interface SurfaceTabletSettings {
   doubleClickIntervalMs: number;
   enableBarrelPan: boolean;
   panThresholdPx: number;
+  naturalPanDirection: boolean;
   showCanvasControls: boolean;
   debugLogging: boolean;
 }
@@ -14,6 +15,7 @@ export const DEFAULT_SETTINGS: SurfaceTabletSettings = {
   doubleClickIntervalMs: 300,
   enableBarrelPan: true,
   panThresholdPx: 5,
+  naturalPanDirection: true,
   showCanvasControls: true,
   debugLogging: false,
 };
@@ -43,6 +45,10 @@ export function sanitizeSettings(value: unknown): SurfaceTabletSettings {
       numberValue(input.panThresholdPx, DEFAULT_SETTINGS.panThresholdPx),
       2,
       20,
+    ),
+    naturalPanDirection: booleanValue(
+      input.naturalPanDirection,
+      DEFAULT_SETTINGS.naturalPanDirection,
     ),
     showCanvasControls: booleanValue(input.showCanvasControls, DEFAULT_SETTINGS.showCanvasControls),
     debugLogging: booleanValue(input.debugLogging, DEFAULT_SETTINGS.debugLogging),

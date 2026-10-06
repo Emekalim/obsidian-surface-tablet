@@ -7,7 +7,12 @@ export interface CanvasViewport {
 
 /** Applies direct viewport movement after native pen/right-drag handling proves insufficient. */
 export class CanvasPanController {
-  pan(viewport: CanvasViewport | null, deltaX: number, deltaY: number): boolean {
+  pan(
+    viewport: CanvasViewport | null,
+    deltaX: number,
+    deltaY: number,
+    naturalDirection: boolean,
+  ): boolean {
     if (
       !viewport ||
       !Number.isFinite(viewport.tx) ||
@@ -19,8 +24,9 @@ export class CanvasPanController {
       return false;
     }
 
-    viewport.tx += deltaX;
-    viewport.ty += deltaY;
+    const direction = naturalDirection ? -1 : 1;
+    viewport.tx += deltaX * direction;
+    viewport.ty += deltaY * direction;
     viewport.markViewportChanged();
     return true;
   }

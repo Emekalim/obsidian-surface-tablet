@@ -22,6 +22,7 @@ describe("sanitizeSettings", () => {
       doubleClickIntervalMs: 350,
       enableBarrelPan: false,
       panThresholdPx: 8,
+      naturalPanDirection: false,
       showCanvasControls: false,
       debugLogging: true,
     });
@@ -31,6 +32,7 @@ describe("sanitizeSettings", () => {
       doubleClickIntervalMs: 350,
       enableBarrelPan: false,
       panThresholdPx: 8,
+      naturalPanDirection: false,
       showCanvasControls: false,
       debugLogging: true,
     });

@@ -23,6 +23,7 @@ export interface PenGestureDependencies {
 interface DirectPanGesture {
   pointerId: number;
   viewport: CanvasViewport;
+  startTime: number;
   startX: number;
   startY: number;
   lastX: number;
@@ -41,8 +42,10 @@ interface PointerCaptureTarget extends EventTarget {
 export class PenGestureController {
   private readonly machine: BarrelGestureMachine;
   private readonly activeCanvasPointers = new Set<number>();
+  private readonly canvasPointerViewports = new Map<number, CanvasViewport>();
+  private readonly barrelPressedPointers = new Set<number>();
   private persistentPan: DirectPanGesture | null = null;
-  private barrelPanViewport: CanvasViewport | null = null;
+  private temporaryPan: DirectPanGesture | null = null;
   private suppressContextMenuUntil = 0;
 
   constructor(
@@ -93,17 +96,25 @@ export class PenGestureController {
     }
 
     const insideCanvas = this.dependencies.canvasTargets.isEligibleCanvasEvent(event);
+    const viewport = insideCanvas
+      ? this.dependencies.canvasTargets.getViewportForEvent(event)
+      : null;
     if (insideCanvas) {
       this.activeCanvasPointers.add(event.pointerId);
+      if (viewport) {
+        this.canvasPointerViewports.set(event.pointerId, viewport);
+      }
     }
 
     const rawButton = this.dependencies.pointerPatch.readRawButton(event);
+    this.updateBarrelButtonState(event, insideCanvas);
+
     if (insideCanvas && rawButton === 0 && this.dependencies.getModeState().panModeEnabled) {
-      const viewport = this.dependencies.canvasTargets.getViewportForEvent(event);
       if (viewport) {
         this.persistentPan = {
           pointerId: event.pointerId,
           viewport,
+          startTime: event.timeStamp,
           startX: event.clientX,
           startY: event.clientY,
           lastX: event.clientX,
@@ -121,26 +132,29 @@ export class PenGestureController {
       return;
     }
 
-    if (rawButton !== 2) {
+    if (!this.barrelPressedPointers.has(event.pointerId)) {
       return;
     }
 
-    const state = this.dependencies.getModeState();
-    const settings = this.dependencies.getSettings();
-    const viewport = insideCanvas
-      ? this.dependencies.canvasTargets.getViewportForEvent(event)
-      : null;
-    const decision = this.machine.pointerDown({
-      ...pointerInput(event),
-      insideCanvas,
-      panAvailable: Boolean(state.tabletModeEnabled && settings.enableBarrelPan && viewport),
-    });
-
-    if (decision.tracked) {
-      this.barrelPanViewport = viewport;
-      this.dependencies.debug("Barrel pointer down", pointerSummary(event, this.dependencies));
+    if (!this.machine.isTracking(event.pointerId) && insideCanvas) {
+      this.applyBarrelDecision(
+        event,
+        this.machine.pointerDown({
+          ...pointerInput(event),
+          insideCanvas: true,
+          panAvailable: false,
+        }),
+      );
     }
-    this.applySuppression(event, decision);
+
+    if (this.canStartTemporaryPan(event, viewport)) {
+      this.beginTemporaryPan(event, viewport as CanvasViewport);
+      // A tip contact made while the barrel is already held would otherwise look
+      // like a left-button mouse down to Canvas and could start moving a card.
+      if (rawButton === 0) {
+        suppressEvent(event, true);
+      }
+    }
   };
 
   private readonly onPointerMove = (event: PointerEvent): void => {
@@ -148,22 +162,40 @@ export class PenGestureController {
       return;
     }
 
+    const insideCanvas = this.dependencies.canvasTargets.isEligibleCanvasEvent(event);
+    const canvasSession = insideCanvas || this.activeCanvasPointers.has(event.pointerId);
+    const eventViewport = insideCanvas
+      ? this.dependencies.canvasTargets.getViewportForEvent(event)
+      : null;
+    if (eventViewport && this.activeCanvasPointers.has(event.pointerId)) {
+      this.canvasPointerViewports.set(event.pointerId, eventViewport);
+    }
+    const sessionViewport = canvasSession
+      ? (eventViewport ?? this.canvasPointerViewports.get(event.pointerId) ?? null)
+      : null;
+
+    this.updateBarrelButtonState(event, canvasSession);
+
     if (this.persistentPan?.pointerId === event.pointerId) {
       this.movePersistentPan(event);
       return;
     }
 
-    const decision = this.machine.pointerMove(pointerInput(event));
-    const moved = this.applyBarrelPan(decision);
-    if (decision.panStarted) {
-      this.suppressContextMenuUntil = Date.now() + 1_000;
-      this.dependencies.debug(
-        "Temporary barrel pan started",
-        pointerSummary(event, this.dependencies),
-      );
+    if (
+      !this.temporaryPan &&
+      this.barrelPressedPointers.has(event.pointerId) &&
+      isPenContact(event, this.dependencies) &&
+      this.canStartTemporaryPan(event, sessionViewport)
+    ) {
+      this.beginTemporaryPan(event, sessionViewport as CanvasViewport);
     }
-    if (moved) {
-      suppressEvent(event, true);
+
+    if (this.machine.isTracking(event.pointerId)) {
+      this.machine.pointerMove(pointerInput(event));
+    }
+
+    if (this.temporaryPan?.pointerId === event.pointerId) {
+      this.moveTemporaryPan(event);
     }
   };
 
@@ -178,28 +210,18 @@ export class PenGestureController {
       return;
     }
 
-    const decision = this.machine.pointerUp(pointerInput(event));
-    this.applyBarrelPan(decision);
-    this.applySuppression(event, decision);
+    if (this.machine.isTracking(event.pointerId)) {
+      this.machine.pointerMove(pointerInput(event));
+    }
+    if (this.temporaryPan?.pointerId === event.pointerId) {
+      this.finishTemporaryPan(event);
+    }
 
-    if (decision.panEnded) {
-      if (event.cancelable) {
-        event.preventDefault();
-      }
-      this.dependencies.debug(
-        "Temporary barrel pan ended",
-        pointerSummary(event, this.dependencies),
-      );
-    }
-    this.barrelPanViewport = null;
-
-    if (decision.suppressContextMenu) {
-      this.suppressContextMenuUntil = Date.now() + 1_000;
-    }
-    if (decision.toggleTabletMode) {
-      this.dependencies.debug("Barrel double-click recognized");
-      this.dependencies.toggleTabletMode();
-    }
+    this.updateBarrelButtonState(
+      event,
+      this.dependencies.canvasTargets.isEligibleCanvasEvent(event) ||
+        this.activeCanvasPointers.has(event.pointerId),
+    );
     this.releaseCanvasPointerAfterDispatch(event.pointerId);
   };
 
@@ -257,7 +279,12 @@ export class PenGestureController {
     const deltaY = event.clientY - gesture.lastY;
     gesture.lastX = event.clientX;
     gesture.lastY = event.clientY;
-    this.dependencies.panController.pan(gesture.viewport, deltaX, deltaY);
+    this.dependencies.panController.pan(
+      gesture.viewport,
+      deltaX,
+      deltaY,
+      this.dependencies.getSettings().naturalPanDirection,
+    );
     suppressEvent(event, true);
   }
 
@@ -272,23 +299,13 @@ export class PenGestureController {
         gesture.viewport,
         event.clientX - gesture.lastX,
         event.clientY - gesture.lastY,
+        this.dependencies.getSettings().naturalPanDirection,
       );
       this.dependencies.debug("Persistent pan ended", pointerSummary(event, this.dependencies));
     }
     suppressEvent(event, true);
     releasePointer(gesture.captureTarget, event.pointerId);
     this.persistentPan = null;
-  }
-
-  private applyBarrelPan(decision: BarrelGestureDecision): boolean {
-    if (decision.panDeltaX === undefined || decision.panDeltaY === undefined) {
-      return false;
-    }
-    return this.dependencies.panController.pan(
-      this.barrelPanViewport,
-      decision.panDeltaX,
-      decision.panDeltaY,
-    );
   }
 
   private applySuppression(event: Event, decision: BarrelGestureDecision): void {
@@ -298,20 +315,30 @@ export class PenGestureController {
   }
 
   private cancelPointer(pointerId: number, reason: string): void {
+    const hadPan =
+      this.persistentPan?.pointerId === pointerId || this.temporaryPan?.pointerId === pointerId;
     if (this.persistentPan?.pointerId === pointerId) {
       releasePointer(this.persistentPan.captureTarget, pointerId);
       this.persistentPan = null;
     }
+    if (this.temporaryPan?.pointerId === pointerId) {
+      releasePointer(this.temporaryPan.captureTarget, pointerId);
+      this.temporaryPan = null;
+    }
     const decision = this.machine.cancel(pointerId);
-    this.barrelPanViewport = null;
+    this.barrelPressedPointers.delete(pointerId);
+    this.canvasPointerViewports.delete(pointerId);
     this.releaseCanvasPointerAfterDispatch(pointerId);
-    if (decision.panEnded) {
+    if (hadPan || decision.panEnded) {
       this.dependencies.debug(reason);
     }
   }
 
   private releaseCanvasPointerAfterDispatch(pointerId: number): void {
-    this.ownerWindow.setTimeout(() => this.activeCanvasPointers.delete(pointerId), 0);
+    this.ownerWindow.setTimeout(() => {
+      this.activeCanvasPointers.delete(pointerId);
+      this.canvasPointerViewports.delete(pointerId);
+    }, 0);
   }
 
   private resetGestures(): void {
@@ -320,9 +347,154 @@ export class PenGestureController {
     }
     this.machine.reset();
     this.persistentPan = null;
-    this.barrelPanViewport = null;
+    if (this.temporaryPan) {
+      releasePointer(this.temporaryPan.captureTarget, this.temporaryPan.pointerId);
+    }
+    this.temporaryPan = null;
+    this.barrelPressedPointers.clear();
+    this.canvasPointerViewports.clear();
     this.activeCanvasPointers.clear();
     this.suppressContextMenuUntil = 0;
+  }
+
+  private updateBarrelButtonState(event: PointerEvent, insideCanvas: boolean): void {
+    const pressed = (this.dependencies.pointerPatch.readRawButtons(event) & 2) !== 0;
+    const wasPressed = this.barrelPressedPointers.has(event.pointerId);
+    if (pressed === wasPressed) {
+      return;
+    }
+
+    if (pressed) {
+      this.barrelPressedPointers.add(event.pointerId);
+      const decision = this.machine.pointerDown({
+        ...pointerInput(event),
+        insideCanvas,
+        panAvailable: false,
+      });
+      this.applyBarrelDecision(event, decision);
+      if (decision.tracked) {
+        this.dependencies.debug("Barrel button pressed", pointerSummary(event, this.dependencies));
+      }
+      return;
+    }
+
+    this.barrelPressedPointers.delete(event.pointerId);
+    if (this.temporaryPan?.pointerId === event.pointerId) {
+      this.finishTemporaryPan(event);
+    }
+    this.applyBarrelDecision(event, this.machine.pointerUp(pointerInput(event)));
+    this.dependencies.debug("Barrel button released", pointerSummary(event, this.dependencies));
+  }
+
+  private applyBarrelDecision(event: Event, decision: BarrelGestureDecision): void {
+    this.applySuppression(event, decision);
+    if (decision.suppressContextMenu) {
+      this.suppressContextMenuUntil = Date.now() + 1_000;
+    }
+    if (decision.toggleTabletMode) {
+      this.dependencies.debug("Barrel double-click recognized");
+      this.dependencies.toggleTabletMode();
+    }
+  }
+
+  private canStartTemporaryPan(event: PointerEvent, viewport: CanvasViewport | null): boolean {
+    const settings = this.dependencies.getSettings();
+    return Boolean(
+      !this.temporaryPan &&
+      viewport &&
+      this.dependencies.getModeState().tabletModeEnabled &&
+      settings.enableBarrelPan &&
+      this.barrelPressedPointers.has(event.pointerId) &&
+      isPenContact(event, this.dependencies),
+    );
+  }
+
+  private beginTemporaryPan(event: PointerEvent, viewport: CanvasViewport): void {
+    this.temporaryPan = {
+      pointerId: event.pointerId,
+      viewport,
+      startTime: event.timeStamp,
+      startX: event.clientX,
+      startY: event.clientY,
+      lastX: event.clientX,
+      lastY: event.clientY,
+      started: false,
+      captureTarget: pointerCaptureTarget(event.target),
+    };
+    this.dependencies.debug("Temporary barrel pan armed", pointerSummary(event, this.dependencies));
+  }
+
+  private moveTemporaryPan(event: PointerEvent): void {
+    const gesture = this.temporaryPan;
+    if (!gesture) {
+      return;
+    }
+
+    if (!gesture.started) {
+      const settings = this.dependencies.getSettings();
+      const distance = Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY);
+      const clickTolerance = Math.max(12, settings.panThresholdPx * 3);
+      if (event.timeStamp - gesture.startTime < 80 && distance < clickTolerance) {
+        suppressEvent(event, true);
+        return;
+      }
+      if (distance < settings.panThresholdPx) {
+        suppressEvent(event, true);
+        return;
+      }
+      gesture.started = true;
+      // Once movement becomes a pan it must no longer be eligible as either
+      // click of a barrel-button double-click.
+      this.machine.cancel(event.pointerId);
+      capturePointer(gesture.captureTarget, event.pointerId);
+      this.suppressContextMenuUntil = Date.now() + 1_000;
+      this.dependencies.debug(
+        "Temporary barrel pan started",
+        pointerSummary(event, this.dependencies),
+      );
+    }
+
+    this.dependencies.panController.pan(
+      gesture.viewport,
+      event.clientX - gesture.lastX,
+      event.clientY - gesture.lastY,
+      this.dependencies.getSettings().naturalPanDirection,
+    );
+    gesture.lastX = event.clientX;
+    gesture.lastY = event.clientY;
+    suppressEvent(event, true);
+  }
+
+  private finishTemporaryPan(event: PointerEvent): void {
+    const gesture = this.temporaryPan;
+    if (!gesture) {
+      return;
+    }
+
+    if (gesture.started) {
+      this.dependencies.panController.pan(
+        gesture.viewport,
+        event.clientX - gesture.lastX,
+        event.clientY - gesture.lastY,
+        this.dependencies.getSettings().naturalPanDirection,
+      );
+      this.suppressContextMenuUntil = Date.now() + 1_000;
+      if (event.type === "pointerup") {
+        // Let Canvas observe the release so a native gesture that began before
+        // the barrel press cannot remain latched after temporary panning.
+        if (event.cancelable) {
+          event.preventDefault();
+        }
+      } else {
+        suppressEvent(event, true);
+      }
+      this.dependencies.debug(
+        "Temporary barrel pan ended",
+        pointerSummary(event, this.dependencies),
+      );
+    }
+    releasePointer(gesture.captureTarget, event.pointerId);
+    this.temporaryPan = null;
   }
 }
 
@@ -333,6 +505,13 @@ function pointerInput(event: PointerEvent): BarrelPointerInput {
     clientX: event.clientX,
     clientY: event.clientY,
   };
+}
+
+function isPenContact(event: PointerEvent, dependencies: PenGestureDependencies): boolean {
+  return (
+    event.pressure > 0 ||
+    (event.type === "pointerdown" && dependencies.pointerPatch.readRawButton(event) === 0)
+  );
 }
 
 function suppressEvent(event: Event, immediate = false): void {

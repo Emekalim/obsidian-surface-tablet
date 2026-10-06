@@ -42,6 +42,10 @@ export class BarrelGestureMachine {
 
   constructor(private readonly getConfig: () => BarrelGestureConfig) {}
 
+  isTracking(pointerId: number): boolean {
+    return this.active?.pointerId === pointerId;
+  }
+
   pointerDown(input: BarrelDownInput): BarrelGestureDecision {
     const config = this.getConfig();
     this.expireFirstClick(input.timestamp, config.doubleClickIntervalMs);

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+- Added configurable pan direction, with natural swipe-style panning enabled by default.
+- Detect barrel-button presses from `buttons` state transitions during pen hover instead of requiring a barrel `pointerdown` event.
+- Carry a barrel hold recognized before tip contact into temporary Canvas panning.
+- Start temporary panning when the barrel button is pressed after tip contact.
+- Prevent completed pans from being classified as barrel clicks.
+- Keep gesture tracking Canvas-scoped while pointer events are retargeted during contact.
+
 ## 0.2.0
 
 - Added direct Canvas viewport panning for temporary barrel drag and persistent Pan Mode.
