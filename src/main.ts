@@ -100,6 +100,18 @@ export default class SurfaceTabletPlugin extends Plugin {
       name: "Tablet Mode: Toggle pan mode",
       callback: () => this.togglePanMode("command"),
     });
+
+    this.addCommand({
+      id: "clear-pen-diagnostics",
+      name: "Tablet Mode: Clear pen diagnostics",
+      callback: () => this.clearPenDiagnostics(),
+    });
+
+    this.addCommand({
+      id: "copy-pen-diagnostics",
+      name: "Tablet Mode: Copy pen diagnostics",
+      callback: () => void this.copyPenDiagnostics(),
+    });
   }
 
   private readonly queueEnvironmentSync = (): void => {
@@ -231,6 +243,55 @@ export default class SurfaceTabletPlugin extends Plugin {
     }
     new Notice("Surface Tablet v1 supports Obsidian Desktop on Windows only.");
     return false;
+  }
+
+  private clearPenDiagnostics(): void {
+    for (const runtime of this.windowRuntimes.values()) {
+      runtime.gestures.clearDiagnostics();
+    }
+    new Notice("Surface Tablet: Pen diagnostics cleared.");
+  }
+
+  private async copyPenDiagnostics(): Promise<void> {
+    const events = [...this.windowRuntimes.entries()]
+      .flatMap(([, runtime], windowIndex) =>
+        runtime.gestures.getDiagnostics().map((entry) => ({ windowIndex, ...entry })),
+      )
+      .sort((left, right) =>
+        left.capturedAt === right.capturedAt
+          ? left.sequence - right.sequence
+          : left.capturedAt - right.capturedAt,
+      );
+    const payload = JSON.stringify(
+      {
+        schema: "surface-tablet-pen-diagnostics-v1",
+        exportedAt: new Date().toISOString(),
+        pluginVersion: this.manifest.version,
+        platform: window.navigator.platform,
+        userAgent: window.navigator.userAgent,
+        settings: {
+          enableBarrelDoubleClick: this.settings.enableBarrelDoubleClick,
+          doubleClickIntervalMs: this.settings.doubleClickIntervalMs,
+          enableBarrelPan: this.settings.enableBarrelPan,
+          panThresholdPx: this.settings.panThresholdPx,
+          naturalPanDirection: this.settings.naturalPanDirection,
+          debugLogging: this.settings.debugLogging,
+        },
+        mode: this.modeState.snapshot(),
+        events,
+      },
+      null,
+      2,
+    );
+
+    try {
+      await window.navigator.clipboard.writeText(payload);
+      new Notice(`Surface Tablet: Copied ${events.length} diagnostic events.`);
+    } catch (error) {
+      console.info("[DEBUG-ST-EXPORT-v1] Copy this diagnostic payload:", payload);
+      this.reportError("Could not copy pen diagnostics; wrote them to the console instead", error);
+      new Notice("Surface Tablet: Copy failed; diagnostics were written to the console.");
+    }
   }
 
   private debug(message: string, details?: unknown): void {

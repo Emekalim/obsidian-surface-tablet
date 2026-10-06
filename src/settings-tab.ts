@@ -111,7 +111,7 @@ export class SurfaceTabletSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Debug logging")
       .setDesc(
-        "Log pen gesture details to the developer console. Pointer moves are logged only at gesture transitions.",
+        "Capture raw Canvas pointer-state changes and log them to the developer console. Use the Clear and Copy pen diagnostics commands to collect a test trace.",
       )
       .addToggle((toggle) =>
         toggle.setValue(this.host.settings.debugLogging).onChange(async (value) => {

@@ -21,6 +21,7 @@ describe("PenGestureController", () => {
   let requestEnvironmentSync: ReturnType<typeof vi.fn<() => void>>;
   let state: { tabletModeEnabled: boolean; panModeEnabled: boolean };
   let naturalPanDirection: boolean;
+  let debugLogging: boolean;
   let controller: PenGestureController;
 
   beforeEach(() => {
@@ -34,6 +35,7 @@ describe("PenGestureController", () => {
     requestEnvironmentSync = vi.fn<() => void>();
     state = { tabletModeEnabled: true, panModeEnabled: false };
     naturalPanDirection = true;
+    debugLogging = false;
 
     controller = new PenGestureController(window, {
       pointerPatch: {
@@ -51,7 +53,7 @@ describe("PenGestureController", () => {
         panThresholdPx: 5,
         naturalPanDirection,
         showCanvasControls: true,
-        debugLogging: false,
+        debugLogging,
       }),
       getModeState: () => state,
       toggleTabletMode,
@@ -161,6 +163,44 @@ describe("PenGestureController", () => {
     expect(viewport.ty).toBe(0);
   });
 
+  it("captures changed raw hover button states when diagnostics are enabled", () => {
+    debugLogging = true;
+    card.dispatchEvent(pointerEvent("pointermove", 0, 0, 0, -1, 0, 0));
+    card.dispatchEvent(pointerEvent("pointermove", 10, 1, 0, -1, 2, 0));
+    card.dispatchEvent(pointerEvent("pointermove", 20, 2, 0, -1, 2, 0));
+    card.dispatchEvent(pointerEvent("pointermove", 30, 2, 0, -1, 0, 0));
+
+    expect(controller.getDiagnostics().map((entry) => entry.rawButtons)).toEqual([0, 2, 0]);
+    expect(controller.getDiagnostics()[1]).toMatchObject({
+      eventType: "pointermove",
+      rawPointerType: "pen",
+      barrelButtonActive: true,
+      targetInsideCanvas: true,
+    });
+
+    controller.clearDiagnostics();
+    expect(controller.getDiagnostics()).toEqual([]);
+  });
+
+  it("does not retain diagnostics while debug logging is disabled", () => {
+    card.dispatchEvent(pointerEvent("pointermove", 0, 0, 0, -1, 2, 0));
+    expect(controller.getDiagnostics()).toEqual([]);
+  });
+
+  it("captures non-pen Canvas events for comparison without handling them", () => {
+    debugLogging = true;
+    card.dispatchEvent(pointerEvent("pointerdown", 0, 0, 0, 2, 2, 0, "mouse"));
+
+    expect(controller.getDiagnostics()).toHaveLength(1);
+    expect(controller.getDiagnostics()[0]).toMatchObject({
+      eventType: "pointerdown",
+      rawPointerType: "mouse",
+      rawButton: 2,
+      rawButtons: 2,
+    });
+    expect(viewport.markViewportChanged).not.toHaveBeenCalled();
+  });
+
   it("requests a lifecycle refresh when the Obsidian window regains focus", () => {
     window.dispatchEvent(new Event("focus"));
     expect(requestEnvironmentSync).toHaveBeenCalledOnce();
@@ -175,6 +215,7 @@ function pointerEvent(
   rawButton: number,
   rawButtons: number,
   pressure = 0.5,
+  rawPointerType = "pen",
 ): TestPointerEvent {
   const event = new Event(type, { bubbles: true, cancelable: true }) as TestPointerEvent;
   const properties = {
@@ -183,7 +224,7 @@ function pointerEvent(
     clientX,
     clientY,
     pressure,
-    rawPointerType: "pen",
+    rawPointerType,
     rawButton,
     rawButtons,
   };

@@ -20,6 +20,32 @@ export interface PenGestureDependencies {
   debug: (message: string, details?: unknown) => void;
 }
 
+export interface PenDiagnosticEntry {
+  sequence: number;
+  capturedAt: number;
+  eventType: string;
+  eventTimestamp: number;
+  pointerId?: number;
+  rawPointerType?: string;
+  reportedPointerType?: string;
+  rawButton?: number;
+  rawButtons?: number;
+  barrelButtonActive?: boolean;
+  pressure?: number;
+  isPrimary?: boolean;
+  clientX: number;
+  clientY: number;
+  target: string;
+  path: string[];
+  targetInsideCanvas: boolean;
+  activeCanvasSession: boolean;
+  tabletModeEnabled: boolean;
+  panModeEnabled: boolean;
+  barrelGestureTracked: boolean;
+  temporaryPanState: "inactive" | "armed" | "panning";
+  contextMenuSuppressed?: boolean;
+}
+
 interface DirectPanGesture {
   pointerId: number;
   viewport: CanvasViewport;
@@ -40,6 +66,7 @@ interface PointerCaptureTarget extends EventTarget {
 
 /** Tracks Canvas pointer sessions and implements barrel and persistent panning. */
 export class PenGestureController {
+  private static readonly diagnosticLimit = 500;
   private readonly machine: BarrelGestureMachine;
   private readonly activeCanvasPointers = new Set<number>();
   private readonly canvasPointerViewports = new Map<number, CanvasViewport>();
@@ -47,6 +74,10 @@ export class PenGestureController {
   private persistentPan: DirectPanGesture | null = null;
   private temporaryPan: DirectPanGesture | null = null;
   private suppressContextMenuUntil = 0;
+  private diagnosticSequence = 0;
+  private readonly diagnostics: PenDiagnosticEntry[] = [];
+  private readonly lastMoveDiagnosticSignature = new Map<number, string>();
+  private readonly diagnosticCanvasPointers = new Set<number>();
 
   constructor(
     private readonly ownerWindow: Window,
@@ -90,12 +121,26 @@ export class PenGestureController {
     return this.activeCanvasPointers.has(event.pointerId);
   }
 
+  getDiagnostics(): readonly PenDiagnosticEntry[] {
+    return [...this.diagnostics];
+  }
+
+  clearDiagnostics(): void {
+    this.diagnostics.length = 0;
+    this.lastMoveDiagnosticSignature.clear();
+    this.diagnosticCanvasPointers.clear();
+  }
+
   private readonly onPointerDown = (event: PointerEvent): void => {
+    const insideCanvas = this.dependencies.canvasTargets.isEligibleCanvasEvent(event);
+    if (insideCanvas && this.dependencies.getSettings().debugLogging) {
+      this.diagnosticCanvasPointers.add(event.pointerId);
+      this.recordPointerDiagnostic(event, true, true);
+    }
     if (this.dependencies.pointerPatch.readRawPointerType(event) !== "pen") {
       return;
     }
 
-    const insideCanvas = this.dependencies.canvasTargets.isEligibleCanvasEvent(event);
     const viewport = insideCanvas
       ? this.dependencies.canvasTargets.getViewportForEvent(event)
       : null;
@@ -158,12 +203,18 @@ export class PenGestureController {
   };
 
   private readonly onPointerMove = (event: PointerEvent): void => {
+    const insideCanvas = this.dependencies.canvasTargets.isEligibleCanvasEvent(event);
+    const canvasSession =
+      insideCanvas ||
+      this.activeCanvasPointers.has(event.pointerId) ||
+      this.diagnosticCanvasPointers.has(event.pointerId);
+    if (canvasSession) {
+      this.recordPointerDiagnostic(event, insideCanvas, canvasSession);
+    }
     if (this.dependencies.pointerPatch.readRawPointerType(event) !== "pen") {
       return;
     }
 
-    const insideCanvas = this.dependencies.canvasTargets.isEligibleCanvasEvent(event);
-    const canvasSession = insideCanvas || this.activeCanvasPointers.has(event.pointerId);
     const eventViewport = insideCanvas
       ? this.dependencies.canvasTargets.getViewportForEvent(event)
       : null;
@@ -200,6 +251,15 @@ export class PenGestureController {
   };
 
   private readonly onPointerUp = (event: PointerEvent): void => {
+    const insideCanvas = this.dependencies.canvasTargets.isEligibleCanvasEvent(event);
+    const canvasSession =
+      insideCanvas ||
+      this.activeCanvasPointers.has(event.pointerId) ||
+      this.diagnosticCanvasPointers.has(event.pointerId);
+    if (canvasSession) {
+      this.recordPointerDiagnostic(event, insideCanvas, canvasSession);
+    }
+    this.diagnosticCanvasPointers.delete(event.pointerId);
     if (this.dependencies.pointerPatch.readRawPointerType(event) !== "pen") {
       return;
     }
@@ -217,23 +277,30 @@ export class PenGestureController {
       this.finishTemporaryPan(event);
     }
 
-    this.updateBarrelButtonState(
-      event,
-      this.dependencies.canvasTargets.isEligibleCanvasEvent(event) ||
-        this.activeCanvasPointers.has(event.pointerId),
-    );
+    this.updateBarrelButtonState(event, canvasSession);
     this.releaseCanvasPointerAfterDispatch(event.pointerId);
   };
 
   private readonly onPointerCancel = (event: PointerEvent): void => {
+    const insideCanvas = this.dependencies.canvasTargets.isEligibleCanvasEvent(event);
+    if (insideCanvas || this.diagnosticCanvasPointers.has(event.pointerId)) {
+      this.recordPointerDiagnostic(event, insideCanvas, true);
+    }
+    this.diagnosticCanvasPointers.delete(event.pointerId);
     this.cancelPointer(event.pointerId, "Pointer cancelled");
   };
 
   private readonly onLostPointerCapture = (event: PointerEvent): void => {
+    const insideCanvas = this.dependencies.canvasTargets.isEligibleCanvasEvent(event);
+    if (insideCanvas || this.diagnosticCanvasPointers.has(event.pointerId)) {
+      this.recordPointerDiagnostic(event, insideCanvas, true);
+    }
+    this.diagnosticCanvasPointers.delete(event.pointerId);
     this.cancelPointer(event.pointerId, "Pointer capture lost");
   };
 
   private readonly onContextMenu = (event: MouseEvent): void => {
+    this.recordContextMenuDiagnostic(event);
     if (Date.now() > this.suppressContextMenuUntil) {
       return;
     }
@@ -354,7 +421,117 @@ export class PenGestureController {
     this.barrelPressedPointers.clear();
     this.canvasPointerViewports.clear();
     this.activeCanvasPointers.clear();
+    this.diagnosticCanvasPointers.clear();
     this.suppressContextMenuUntil = 0;
+  }
+
+  private recordPointerDiagnostic(
+    event: PointerEvent,
+    targetInsideCanvas: boolean,
+    activeCanvasSession: boolean,
+  ): void {
+    if (!this.dependencies.getSettings().debugLogging) {
+      return;
+    }
+
+    const rawPointerType = this.dependencies.pointerPatch.readRawPointerType(event);
+    const rawButton = this.dependencies.pointerPatch.readRawButton(event);
+    const rawButtons = this.dependencies.pointerPatch.readRawButtons(event);
+    const temporaryPanState = this.temporaryPan
+      ? this.temporaryPan.started
+        ? "panning"
+        : "armed"
+      : "inactive";
+    const signature = [
+      rawPointerType,
+      rawButton,
+      rawButtons,
+      event.pressure > 0,
+      targetInsideCanvas,
+      activeCanvasSession,
+      temporaryPanState,
+      describeEventTarget(event.target, this.ownerWindow),
+    ].join("|");
+
+    if (
+      event.type === "pointermove" &&
+      this.lastMoveDiagnosticSignature.get(event.pointerId) === signature
+    ) {
+      return;
+    }
+    if (event.type === "pointermove") {
+      this.lastMoveDiagnosticSignature.set(event.pointerId, signature);
+    }
+
+    const state = this.dependencies.getModeState();
+    const entry: PenDiagnosticEntry = {
+      sequence: ++this.diagnosticSequence,
+      capturedAt: Date.now(),
+      eventType: event.type,
+      eventTimestamp: event.timeStamp,
+      pointerId: event.pointerId,
+      rawPointerType,
+      reportedPointerType: event.pointerType,
+      rawButton,
+      rawButtons,
+      barrelButtonActive: (rawButtons & 2) !== 0,
+      pressure: event.pressure,
+      isPrimary: event.isPrimary,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      target: describeEventTarget(event.target, this.ownerWindow),
+      path: describeEventPath(event, this.ownerWindow),
+      targetInsideCanvas,
+      activeCanvasSession,
+      tabletModeEnabled: state.tabletModeEnabled,
+      panModeEnabled: state.panModeEnabled,
+      barrelGestureTracked: this.machine.isTracking(event.pointerId),
+      temporaryPanState,
+    };
+    this.appendDiagnostic(entry);
+  }
+
+  private recordContextMenuDiagnostic(event: MouseEvent): void {
+    if (!this.dependencies.getSettings().debugLogging) {
+      return;
+    }
+    const targetInsideCanvas = this.dependencies.canvasTargets.isEligibleCanvasEvent(event);
+    const contextMenuSuppressed = Date.now() <= this.suppressContextMenuUntil;
+    if (!targetInsideCanvas && !contextMenuSuppressed) {
+      return;
+    }
+    const state = this.dependencies.getModeState();
+    this.appendDiagnostic({
+      sequence: ++this.diagnosticSequence,
+      capturedAt: Date.now(),
+      eventType: event.type,
+      eventTimestamp: event.timeStamp,
+      rawButton: event.button,
+      rawButtons: event.buttons,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      target: describeEventTarget(event.target, this.ownerWindow),
+      path: describeEventPath(event, this.ownerWindow),
+      targetInsideCanvas,
+      activeCanvasSession: false,
+      tabletModeEnabled: state.tabletModeEnabled,
+      panModeEnabled: state.panModeEnabled,
+      barrelGestureTracked: false,
+      temporaryPanState: this.temporaryPan
+        ? this.temporaryPan.started
+          ? "panning"
+          : "armed"
+        : "inactive",
+      contextMenuSuppressed,
+    });
+  }
+
+  private appendDiagnostic(entry: PenDiagnosticEntry): void {
+    this.diagnostics.push(entry);
+    if (this.diagnostics.length > PenGestureController.diagnosticLimit) {
+      this.diagnostics.splice(0, this.diagnostics.length - PenGestureController.diagnosticLimit);
+    }
+    this.dependencies.debug(`[DEBUG-ST-INPUT-v1] ${entry.eventType}`, entry);
   }
 
   private updateBarrelButtonState(event: PointerEvent, insideCanvas: boolean): void {
@@ -567,4 +744,33 @@ function pointerSummary(event: PointerEvent, dependencies: PenGestureDependencie
     pressure: event.pressure,
     target: event.target,
   };
+}
+
+function describeEventPath(event: Event, ownerWindow: Window): string[] {
+  return event
+    .composedPath()
+    .slice(0, 8)
+    .map((target) => describeEventTarget(target, ownerWindow));
+}
+
+function describeEventTarget(target: EventTarget | null, ownerWindow: Window): string {
+  if (!target) {
+    return "null";
+  }
+  if (target === ownerWindow) {
+    return "window";
+  }
+  if (target === ownerWindow.document) {
+    return "document";
+  }
+  if ("tagName" in target && "classList" in target) {
+    const element = target as Element;
+    const id = element.id ? `#${element.id}` : "";
+    const classes = [...element.classList]
+      .slice(0, 6)
+      .map((name) => `.${name}`)
+      .join("");
+    return `${element.tagName.toLowerCase()}${id}${classes}`;
+  }
+  return target.constructor?.name ?? "EventTarget";
 }

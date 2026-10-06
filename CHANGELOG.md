@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1
+
+- Added an opt-in raw Canvas pointer-event diagnostic buffer for Surface hardware investigation.
+- Added commands to clear and copy structured pen diagnostics.
+- Included non-pen Canvas pointer classifications in traces to detect OS or Electron event conversion.
+- Kept diagnostic logging disabled by default and limited the buffer to 500 state-changing events.
+
 ## 0.3.0
 
 - Added configurable pan direction, with natural swipe-style panning enabled by default.

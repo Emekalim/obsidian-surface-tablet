@@ -94,6 +94,25 @@ The implementation is split into independently testable pieces:
 - Focus and visibility restoration refresh Canvas roots and verify that event getters are still installed.
 - No telemetry is collected. Debug output stays in the local developer console.
 
+## Capturing Surface Pen diagnostics
+
+Diagnostics are local and disabled by default. To capture a hardware trace:
+
+1. Enable **Debug logging** in Surface Tablet settings.
+2. Run `Tablet Mode: Clear pen diagnostics` from the command palette.
+3. Perform one test gesture on blank Canvas.
+4. Run `Tablet Mode: Copy pen diagnostics`.
+5. Paste the copied JSON into the bug report and state whether the gesture worked.
+
+Capture these gestures separately so their event streams remain easy to compare:
+
+- One barrel-button press and release while hovering, without touching the screen.
+- Two barrel-button presses while hovering.
+- Hold the barrel button while hovering, touch blank Canvas, then drag.
+- Touch blank Canvas first, press the barrel button, then drag.
+
+The buffer records changed pointer states inside Canvas, including pen, mouse, and touch classifications. It is capped at 500 events and omits note text. Tagged `[DEBUG-ST-INPUT-v1]` entries are also written to DevTools while logging is enabled.
+
 ## Hardware validation status
 
 Designed for Windows Surface devices and currently tested with a Microsoft Surface Pen. The repository will remain private and versioned below 1.0 until the complete manual test matrix passes on an identified Surface and pen model.
