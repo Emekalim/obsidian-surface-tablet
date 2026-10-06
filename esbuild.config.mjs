@@ -1,7 +1,14 @@
 import esbuild from "esbuild";
+import { copyFile, mkdir } from "node:fs/promises";
 import process from "node:process";
 
 const production = process.argv[2] === "production";
+const outputDirectory = "dist";
+
+await mkdir(outputDirectory, { recursive: true });
+await Promise.all(
+  ["manifest.json", "styles.css"].map((file) => copyFile(file, `${outputDirectory}/${file}`)),
+);
 
 const context = await esbuild.context({
   entryPoints: ["src/main.ts"],
@@ -12,7 +19,7 @@ const context = await esbuild.context({
   logLevel: "info",
   sourcemap: production ? false : "inline",
   treeShaking: true,
-  outfile: "main.js",
+  outfile: `${outputDirectory}/main.js`,
 });
 
 if (production) {
@@ -20,5 +27,5 @@ if (production) {
   await context.dispose();
 } else {
   await context.watch();
-  console.log("Watching Surface Tablet sources...");
+  console.log(`Watching Surface Tablet sources in ${outputDirectory}/...`);
 }

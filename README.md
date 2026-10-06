@@ -60,8 +60,10 @@ This repository is private and no release build is published while Surface testi
 
 1. Run `npm install` and `npm run build`.
 2. Create `<vault>/.obsidian/plugins/surface-tablet/`.
-3. Copy `main.js`, `manifest.json`, and `styles.css` into that directory.
+3. Copy `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` into that directory.
 4. Restart Obsidian and enable **Surface Tablet** in Community plugins.
+
+The ignored `dist/` directory is the complete installable plugin output. Files under `src/` are development sources and are not copied into Obsidian.
 
 ## Development
 
@@ -69,7 +71,7 @@ Requirements: Node.js 24 or newer and npm.
 
 ```bash
 npm install
-npm run dev       # watch and rebuild main.js
+npm run dev       # watch and rebuild dist/main.js
 npm run verify    # lint, format check, tests, metadata check, and production build
 ```
 
