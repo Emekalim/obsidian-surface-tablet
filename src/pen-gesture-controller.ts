@@ -15,9 +15,18 @@ export interface PenGestureDependencies {
   panController: CanvasPanController;
   getSettings: () => Readonly<SurfaceTabletSettings>;
   getModeState: () => Readonly<SurfaceTabletModeSnapshot>;
+  watchContextMenuForEvent: (
+    event: MouseEvent,
+    callback: (menu: ObsidianContextMenu) => void,
+  ) => () => void;
   toggleTabletMode: () => void;
   requestEnvironmentSync: () => void;
   debug: (message: string, details?: unknown) => void;
+}
+
+export interface ObsidianContextMenu {
+  hide: () => unknown;
+  onHide: (callback: () => unknown) => unknown;
 }
 
 export interface PenDiagnosticEntry {
@@ -32,6 +41,7 @@ export interface PenDiagnosticEntry {
   rawButtons?: number;
   barrelButtonActive?: boolean;
   pressure?: number;
+  rawIsPrimary?: boolean;
   isPrimary?: boolean;
   clientX: number;
   clientY: number;
@@ -44,6 +54,8 @@ export interface PenDiagnosticEntry {
   barrelGestureTracked: boolean;
   temporaryPanState: "inactive" | "armed" | "panning";
   contextMenuSuppressed?: boolean;
+  contextMenuTracked?: boolean;
+  contextMenuDismissed?: boolean;
 }
 
 interface DirectPanGesture {
@@ -73,6 +85,9 @@ export class PenGestureController {
   private readonly barrelPressedPointers = new Set<number>();
   private persistentPan: DirectPanGesture | null = null;
   private temporaryPan: DirectPanGesture | null = null;
+  private trackedBarrelContextMenu: ObsidianContextMenu | null = null;
+  private contextMenuWatchCleanup: (() => void) | null = null;
+  private trackNextContextMenuUntil = 0;
   private suppressContextMenuUntil = 0;
   private diagnosticSequence = 0;
   private readonly diagnostics: PenDiagnosticEntry[] = [];
@@ -94,7 +109,7 @@ export class PenGestureController {
     ownerWindow.addEventListener("pointerup", this.onPointerUp, true);
     ownerWindow.addEventListener("pointercancel", this.onPointerCancel, true);
     ownerWindow.addEventListener("lostpointercapture", this.onLostPointerCapture, true);
-    ownerWindow.addEventListener("contextmenu", this.onContextMenu, true);
+    ownerWindow.addEventListener("contextmenu", this.onContextMenuCapture, true);
     ownerWindow.addEventListener("blur", this.onWindowBlur, true);
     ownerWindow.addEventListener("focus", this.onWindowFocus, true);
     ownerWindow.document.addEventListener("visibilitychange", this.onVisibilityChange, true);
@@ -107,7 +122,7 @@ export class PenGestureController {
     this.ownerWindow.removeEventListener("pointerup", this.onPointerUp, true);
     this.ownerWindow.removeEventListener("pointercancel", this.onPointerCancel, true);
     this.ownerWindow.removeEventListener("lostpointercapture", this.onLostPointerCapture, true);
-    this.ownerWindow.removeEventListener("contextmenu", this.onContextMenu, true);
+    this.ownerWindow.removeEventListener("contextmenu", this.onContextMenuCapture, true);
     this.ownerWindow.removeEventListener("blur", this.onWindowBlur, true);
     this.ownerWindow.removeEventListener("focus", this.onWindowFocus, true);
     this.ownerWindow.document.removeEventListener(
@@ -299,11 +314,14 @@ export class PenGestureController {
     this.cancelPointer(event.pointerId, "Pointer capture lost");
   };
 
-  private readonly onContextMenu = (event: MouseEvent): void => {
-    this.recordContextMenuDiagnostic(event);
-    if (Date.now() > this.suppressContextMenuUntil) {
+  private readonly onContextMenuCapture = (event: MouseEvent): void => {
+    const contextMenuSuppressed = Date.now() <= this.suppressContextMenuUntil;
+    this.recordContextMenuDiagnostic(event, contextMenuSuppressed, false);
+    if (!contextMenuSuppressed) {
+      this.watchBarrelContextMenu(event);
       return;
     }
+    this.trackNextContextMenuUntil = 0;
     this.suppressContextMenuUntil = 0;
     suppressEvent(event, true);
     this.dependencies.debug("Suppressed context menu after pan or double-click");
@@ -422,6 +440,10 @@ export class PenGestureController {
     this.canvasPointerViewports.clear();
     this.activeCanvasPointers.clear();
     this.diagnosticCanvasPointers.clear();
+    this.contextMenuWatchCleanup?.();
+    this.contextMenuWatchCleanup = null;
+    this.trackedBarrelContextMenu = null;
+    this.trackNextContextMenuUntil = 0;
     this.suppressContextMenuUntil = 0;
   }
 
@@ -437,6 +459,7 @@ export class PenGestureController {
     const rawPointerType = this.dependencies.pointerPatch.readRawPointerType(event);
     const rawButton = this.dependencies.pointerPatch.readRawButton(event);
     const rawButtons = this.dependencies.pointerPatch.readRawButtons(event);
+    const rawIsPrimary = this.dependencies.pointerPatch.readRawIsPrimary(event);
     const temporaryPanState = this.temporaryPan
       ? this.temporaryPan.started
         ? "panning"
@@ -476,6 +499,7 @@ export class PenGestureController {
       rawButtons,
       barrelButtonActive: (rawButtons & 2) !== 0,
       pressure: event.pressure,
+      rawIsPrimary,
       isPrimary: event.isPrimary,
       clientX: event.clientX,
       clientY: event.clientY,
@@ -491,12 +515,15 @@ export class PenGestureController {
     this.appendDiagnostic(entry);
   }
 
-  private recordContextMenuDiagnostic(event: MouseEvent): void {
+  private recordContextMenuDiagnostic(
+    event: MouseEvent,
+    contextMenuSuppressed: boolean,
+    contextMenuTracked: boolean,
+  ): void {
     if (!this.dependencies.getSettings().debugLogging) {
       return;
     }
     const targetInsideCanvas = this.dependencies.canvasTargets.isEligibleCanvasEvent(event);
-    const contextMenuSuppressed = Date.now() <= this.suppressContextMenuUntil;
     if (!targetInsideCanvas && !contextMenuSuppressed) {
       return;
     }
@@ -523,6 +550,7 @@ export class PenGestureController {
           : "armed"
         : "inactive",
       contextMenuSuppressed,
+      contextMenuTracked,
     });
   }
 
@@ -565,13 +593,110 @@ export class PenGestureController {
 
   private applyBarrelDecision(event: Event, decision: BarrelGestureDecision): void {
     this.applySuppression(event, decision);
+    if (decision.trackContextMenu) {
+      this.trackNextContextMenuUntil = Date.now() + 1_000;
+    }
     if (decision.suppressContextMenu) {
       this.suppressContextMenuUntil = Date.now() + 1_000;
     }
     if (decision.toggleTabletMode) {
+      this.trackNextContextMenuUntil = 0;
       this.dependencies.debug("Barrel double-click recognized");
+      const contextMenuDismissed = this.hideTrackedBarrelContextMenu();
+      this.annotateLatestPointerDiagnostic(event, contextMenuDismissed);
       this.dependencies.toggleTabletMode();
     }
+  }
+
+  private watchBarrelContextMenu(event: MouseEvent): boolean {
+    if (
+      Date.now() > this.trackNextContextMenuUntil ||
+      !this.dependencies.canvasTargets.isEligibleCanvasEvent(event)
+    ) {
+      return false;
+    }
+
+    this.trackNextContextMenuUntil = 0;
+    this.contextMenuWatchCleanup?.();
+    try {
+      const cleanup = this.dependencies.watchContextMenuForEvent(event, (menu) => {
+        this.captureBarrelContextMenu(event, menu);
+      });
+      this.contextMenuWatchCleanup = cleanup;
+      this.ownerWindow.setTimeout(() => {
+        if (this.contextMenuWatchCleanup === cleanup) {
+          cleanup();
+          this.contextMenuWatchCleanup = null;
+        }
+      }, 150);
+      return true;
+    } catch (error) {
+      this.contextMenuWatchCleanup = null;
+      this.dependencies.debug("Could not watch first barrel-click context menu", error);
+      return false;
+    }
+  }
+
+  private captureBarrelContextMenu(event: MouseEvent, menu: ObsidianContextMenu): void {
+    try {
+      this.trackedBarrelContextMenu = menu;
+      menu.onHide(() => {
+        if (this.trackedBarrelContextMenu === menu) {
+          this.trackedBarrelContextMenu = null;
+        }
+      });
+      this.annotateLatestContextMenuDiagnostic(event);
+      this.dependencies.debug("Tracked exact first barrel-click context menu");
+    } catch (error) {
+      this.trackedBarrelContextMenu = null;
+      this.dependencies.debug("Could not retain first barrel-click context menu", error);
+    }
+  }
+
+  private hideTrackedBarrelContextMenu(): boolean {
+    const menu = this.trackedBarrelContextMenu;
+    this.trackedBarrelContextMenu = null;
+    if (!menu) {
+      return false;
+    }
+
+    try {
+      menu.hide();
+      this.dependencies.debug("Dismissed first barrel-click context menu");
+      return true;
+    } catch (error) {
+      this.dependencies.debug("Could not dismiss first barrel-click context menu", error);
+      return false;
+    }
+  }
+
+  private annotateLatestPointerDiagnostic(event: Event, contextMenuDismissed: boolean): void {
+    const pointerEvent = event as PointerEvent;
+    const latest = this.diagnostics.at(-1);
+    if (
+      latest?.eventType === event.type &&
+      latest.eventTimestamp === event.timeStamp &&
+      latest.pointerId === pointerEvent.pointerId
+    ) {
+      latest.contextMenuDismissed = contextMenuDismissed;
+    }
+  }
+
+  private annotateLatestContextMenuDiagnostic(event: MouseEvent): void {
+    const diagnostic = this.findContextMenuDiagnostic(event);
+    if (diagnostic) {
+      diagnostic.contextMenuTracked = true;
+    }
+  }
+
+  private findContextMenuDiagnostic(event: MouseEvent): PenDiagnosticEntry | undefined {
+    for (let index = this.diagnostics.length - 1; index >= 0; index -= 1) {
+      const diagnostic = this.diagnostics[index];
+      if (diagnostic?.eventType === event.type && diagnostic.eventTimestamp === event.timeStamp) {
+        return diagnostic;
+      }
+    }
+    return undefined;
   }
 
   private canStartTemporaryPan(event: PointerEvent, viewport: CanvasViewport | null): boolean {

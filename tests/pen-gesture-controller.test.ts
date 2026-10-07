@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CanvasPanController, type CanvasViewport } from "../src/canvas-pan-controller";
 import { CanvasTargetRegistry } from "../src/canvas-target-registry";
-import { PenGestureController } from "../src/pen-gesture-controller";
+import { PenGestureController, type ObsidianContextMenu } from "../src/pen-gesture-controller";
 
 interface TestPointerEvent extends Event {
   pointerId: number;
@@ -18,6 +18,11 @@ describe("PenGestureController", () => {
   let card: HTMLElement;
   let viewport: CanvasViewport;
   let toggleTabletMode: ReturnType<typeof vi.fn<() => void>>;
+  let hideContextMenu: ReturnType<typeof vi.fn<() => void>>;
+  let watchContextMenuForEvent: ReturnType<
+    typeof vi.fn<(event: MouseEvent, callback: (menu: ObsidianContextMenu) => void) => () => void>
+  >;
+  let watchedContextMenus: WeakMap<MouseEvent, (menu: ObsidianContextMenu) => void>;
   let requestEnvironmentSync: ReturnType<typeof vi.fn<() => void>>;
   let state: { tabletModeEnabled: boolean; panModeEnabled: boolean };
   let naturalPanDirection: boolean;
@@ -33,6 +38,14 @@ describe("PenGestureController", () => {
     registry = new CanvasTargetRegistry();
     registry.replaceTargets([{ root: card, getViewport: () => viewport }]);
     toggleTabletMode = vi.fn<() => void>();
+    hideContextMenu = vi.fn<() => void>();
+    watchedContextMenus = new WeakMap();
+    watchContextMenuForEvent = vi.fn<
+      (event: MouseEvent, callback: (menu: ObsidianContextMenu) => void) => () => void
+    >((event, callback) => {
+      watchedContextMenus.set(event, callback);
+      return () => watchedContextMenus.delete(event);
+    });
     requestEnvironmentSync = vi.fn<() => void>();
     state = { tabletModeEnabled: true, panModeEnabled: false };
     naturalPanDirection = true;
@@ -44,6 +57,7 @@ describe("PenGestureController", () => {
         readRawPointerType: (event: TestPointerEvent) => event.rawPointerType,
         readRawButton: (event: TestPointerEvent) => event.rawButton,
         readRawButtons: (event: TestPointerEvent) => event.rawButtons,
+        readRawIsPrimary: () => true,
       } as never,
       canvasTargets: registry,
       panController: new CanvasPanController(),
@@ -58,6 +72,7 @@ describe("PenGestureController", () => {
         debugLogging,
       }),
       getModeState: () => state,
+      watchContextMenuForEvent,
       toggleTabletMode,
       requestEnvironmentSync,
       debug: vi.fn(),
@@ -122,6 +137,68 @@ describe("PenGestureController", () => {
     const contextMenu = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
     card.dispatchEvent(contextMenu);
     expect(contextMenu.defaultPrevented).toBe(true);
+  });
+
+  it("hides the exact context menu opened by the first barrel tap", () => {
+    state = { tabletModeEnabled: false, panModeEnabled: false };
+    card.dispatchEvent(pointerEvent("pointerdown", 0, 0, 0, 2, 2, 0.1, "pen", 47));
+    window.dispatchEvent(pointerEvent("pointerup", 80, 0, 0, 2, 0, 0, "pen", 47));
+    const contextMenuEvent = new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+    });
+    card.addEventListener(
+      "contextmenu",
+      () => {
+        watchedContextMenus.get(contextMenuEvent)?.({
+          hide: hideContextMenu,
+          onHide: vi.fn(),
+        });
+      },
+      { once: true },
+    );
+    card.dispatchEvent(contextMenuEvent);
+
+    card.dispatchEvent(pointerEvent("pointerdown", 300, 1, 1, 2, 2, 0.2, "pen", 48));
+    window.dispatchEvent(pointerEvent("pointerup", 370, 1, 1, 2, 0, 0, "pen", 48));
+
+    expect(toggleTabletMode).toHaveBeenCalledOnce();
+    expect(watchContextMenuForEvent).toHaveBeenCalledOnce();
+    expect(hideContextMenu).toHaveBeenCalledOnce();
+  });
+
+  it("retains a Canvas menu shown asynchronously after the context-menu event", () => {
+    vi.useFakeTimers();
+    try {
+      card.dispatchEvent(pointerEvent("pointerdown", 0, 0, 0, 2, 2, 0.1, "pen", 47));
+      window.dispatchEvent(pointerEvent("pointerup", 80, 0, 0, 2, 0, 0, "pen", 47));
+      const contextMenuEvent = new MouseEvent("contextmenu", {
+        bubbles: true,
+        cancelable: true,
+      });
+      card.addEventListener(
+        "contextmenu",
+        () => {
+          window.setTimeout(() => {
+            watchedContextMenus.get(contextMenuEvent)?.({
+              hide: hideContextMenu,
+              onHide: vi.fn(),
+            });
+          }, 11);
+        },
+        { once: true },
+      );
+      card.dispatchEvent(contextMenuEvent);
+      vi.advanceTimersByTime(11);
+
+      card.dispatchEvent(pointerEvent("pointerdown", 300, 1, 1, 2, 2, 0.2, "pen", 48));
+      window.dispatchEvent(pointerEvent("pointerup", 370, 1, 1, 2, 0, 0, "pen", 48));
+
+      expect(toggleTabletMode).toHaveBeenCalledOnce();
+      expect(hideContextMenu).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("recognizes barrel double-clicks from hover button-state transitions", () => {

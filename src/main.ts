@@ -1,7 +1,8 @@
-import { Notice, Platform, Plugin } from "obsidian";
+import { Menu, Notice, Platform, Plugin } from "obsidian";
 import { CanvasTargetRegistry } from "./canvas-target-registry";
 import { CanvasToolbarController } from "./canvas-toolbar-controller";
 import { CanvasPanController } from "./canvas-pan-controller";
+import { ContextMenuShowTracker } from "./context-menu-show-tracker";
 import { SurfaceTabletModeState } from "./mode-state";
 import { PenGestureController } from "./pen-gesture-controller";
 import { WindowPointerPatch } from "./pointer-type-override";
@@ -23,6 +24,7 @@ export default class SurfaceTabletPlugin extends Plugin {
   private readonly canvasTargets = new CanvasTargetRegistry();
   private readonly panController = new CanvasPanController();
   private canvasToolbar: CanvasToolbarController | null = null;
+  private contextMenuShowTracker: ContextMenuShowTracker<Menu> | null = null;
   private readonly windowRuntimes = new Map<Window, WindowRuntime>();
   private readonly failedWindows = new WeakSet<Window>();
   private syncQueued = false;
@@ -37,6 +39,16 @@ export default class SurfaceTabletPlugin extends Plugin {
 
     if (!this.supportedPlatform) {
       return;
+    }
+
+    try {
+      this.contextMenuShowTracker = new ContextMenuShowTracker(Menu.prototype, (error) =>
+        this.reportError("Could not observe an Obsidian context menu", error),
+      );
+      this.contextMenuShowTracker.install();
+    } catch (error) {
+      this.contextMenuShowTracker = null;
+      this.reportError("Context-menu dismissal is unavailable", error);
     }
 
     this.canvasToolbar = new CanvasToolbarController(this.app, this.canvasTargets, {
@@ -65,6 +77,9 @@ export default class SurfaceTabletPlugin extends Plugin {
       runtime.patch.uninstall();
     }
     this.windowRuntimes.clear();
+
+    this.contextMenuShowTracker?.uninstall();
+    this.contextMenuShowTracker = null;
 
     this.canvasToolbar?.destroy();
     this.canvasToolbar = null;
@@ -186,6 +201,13 @@ export default class SurfaceTabletPlugin extends Plugin {
         panController: this.panController,
         getSettings: () => this.settings,
         getModeState: () => this.modeState.snapshot(),
+        watchContextMenuForEvent: (event, callback) => {
+          const tracker = this.contextMenuShowTracker;
+          if (!tracker) {
+            return () => undefined;
+          }
+          return tracker.watch(event, callback);
+        },
         toggleTabletMode: () => this.toggleTabletMode("pen"),
         requestEnvironmentSync: this.queueEnvironmentSync,
         debug: (message, details) => this.debug(message, details),
@@ -264,17 +286,19 @@ export default class SurfaceTabletPlugin extends Plugin {
       );
     const payload = JSON.stringify(
       {
-        schema: "surface-tablet-pen-diagnostics-v1",
+        schema: "surface-tablet-pen-diagnostics-v2",
         exportedAt: new Date().toISOString(),
         pluginVersion: this.manifest.version,
         platform: window.navigator.platform,
         userAgent: window.navigator.userAgent,
         settings: {
+          enableTabletModeOnStartup: this.settings.enableTabletModeOnStartup,
           enableBarrelDoubleClick: this.settings.enableBarrelDoubleClick,
           doubleClickIntervalMs: this.settings.doubleClickIntervalMs,
           enableBarrelPan: this.settings.enableBarrelPan,
           panThresholdPx: this.settings.panThresholdPx,
           naturalPanDirection: this.settings.naturalPanDirection,
+          showCanvasControls: this.settings.showCanvasControls,
           debugLogging: this.settings.debugLogging,
         },
         mode: this.modeState.snapshot(),

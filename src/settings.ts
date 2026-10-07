@@ -9,6 +9,10 @@ export interface SurfaceTabletSettings {
   debugLogging: boolean;
 }
 
+export const DOUBLE_TAP_INTERVAL_MIN_MS = 250;
+export const DOUBLE_TAP_INTERVAL_MAX_MS = 1_000;
+export const DOUBLE_TAP_INTERVAL_STEP_MS = 25;
+
 export const DEFAULT_SETTINGS: SurfaceTabletSettings = {
   enableTabletModeOnStartup: false,
   enableBarrelDoubleClick: true,
@@ -37,8 +41,8 @@ export function sanitizeSettings(value: unknown): SurfaceTabletSettings {
     ),
     doubleClickIntervalMs: clamp(
       numberValue(input.doubleClickIntervalMs, DEFAULT_SETTINGS.doubleClickIntervalMs),
-      200,
-      600,
+      DOUBLE_TAP_INTERVAL_MIN_MS,
+      DOUBLE_TAP_INTERVAL_MAX_MS,
     ),
     enableBarrelPan: booleanValue(input.enableBarrelPan, DEFAULT_SETTINGS.enableBarrelPan),
     panThresholdPx: clamp(

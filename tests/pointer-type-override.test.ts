@@ -23,12 +23,17 @@ class FakePointerEvent extends FakeMouseEvent {
     buttons: number,
     readonly target: object = {},
     readonly pointerId = 1,
+    private readonly nativeIsPrimary = true,
   ) {
     super(button, buttons);
   }
 
   get pointerType(): string {
     return this.nativePointerType;
+  }
+
+  get isPrimary(): boolean {
+    return this.nativeIsPrimary;
   }
 }
 
@@ -38,10 +43,17 @@ const originalPointerTypeDescriptor = Object.getOwnPropertyDescriptor(
   FakePointerEvent.prototype,
   "pointerType",
 );
+const originalIsPrimaryDescriptor = Object.getOwnPropertyDescriptor(
+  FakePointerEvent.prototype,
+  "isPrimary",
+);
 
 afterEach(() => {
   if (originalPointerTypeDescriptor) {
     Object.defineProperty(FakePointerEvent.prototype, "pointerType", originalPointerTypeDescriptor);
+  }
+  if (originalIsPrimaryDescriptor) {
+    Object.defineProperty(FakePointerEvent.prototype, "isPrimary", originalIsPrimaryDescriptor);
   }
   Reflect.deleteProperty(FakePointerEvent.prototype, "button");
   Reflect.deleteProperty(FakePointerEvent.prototype, "buttons");
@@ -67,6 +79,44 @@ describe("WindowPointerPatch", () => {
 
     patch.uninstall();
     expect(pen.pointerType).toBe("pen");
+  });
+
+  it("reports a restored non-primary Canvas pen as primary only in Tablet Mode", () => {
+    const state = { tabletModeEnabled: true, panModeEnabled: false };
+    const patch = new WindowPointerPatch(fakeWindow(), {
+      canvasTargets: { isEligibleCanvasEvent: () => true } as never,
+      isActiveCanvasPointer: () => false,
+      getModeState: () => state,
+      onError: vi.fn(),
+    });
+    patch.install();
+
+    const restoredPen = new FakePointerEvent("pen", 0, 1, {}, 13, false) as unknown as PointerEvent;
+    const secondaryMouse = new FakePointerEvent(
+      "mouse",
+      0,
+      1,
+      {},
+      1,
+      false,
+    ) as unknown as PointerEvent;
+    const secondaryTouch = new FakePointerEvent(
+      "touch",
+      0,
+      1,
+      {},
+      2,
+      false,
+    ) as unknown as PointerEvent;
+    expect(restoredPen.pointerType).toBe("mouse");
+    expect(restoredPen.isPrimary).toBe(true);
+    expect(secondaryMouse.isPrimary).toBe(false);
+    expect(secondaryTouch.isPrimary).toBe(false);
+
+    state.tabletModeEnabled = false;
+    expect(restoredPen.pointerType).toBe("pen");
+    expect(restoredPen.isPrimary).toBe(false);
+    patch.uninstall();
   });
 
   it("leaves pen properties native in persistent Pan Mode for the direct pan controller", () => {

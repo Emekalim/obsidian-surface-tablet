@@ -21,7 +21,7 @@ describe("BarrelGestureMachine", () => {
       tracked: true,
       suppressEvent: false,
     });
-    expect(machine.pointerUp(point(120))).toEqual({ tracked: true });
+    expect(machine.pointerUp(point(120))).toEqual({ tracked: true, trackContextMenu: true });
   });
 
   it("recognizes an armed second click outside Canvas", () => {

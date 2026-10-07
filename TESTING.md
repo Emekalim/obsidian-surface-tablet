@@ -25,6 +25,7 @@ Record the Surface model, pen model, Windows version, Obsidian version, and plug
 - [ ] Toggle Mouse Emulation through the Canvas view-header action.
 - [ ] Toggle Mouse Emulation through the command palette.
 - [ ] Hold the barrel button and tap Canvas twice within 600 ms to enable Mouse Emulation.
+- [ ] Verify the double-tap interval can be adjusted from 250 to 1000 ms and defaults to 600 ms.
 - [ ] Repeat the contact double-tap to restore Native Pen Mode.
 - [ ] The first tap may open its context menu; the second tap suppresses its context menu and toggles the mode.
 - [ ] Notices report command and barrel-gesture state changes.
@@ -63,5 +64,6 @@ Record the Surface model, pen model, Windows version, Obsidian version, and plug
 - [ ] Re-enable the plugin and confirm controls are not duplicated.
 - [ ] Open and close a Canvas popout and confirm its descriptors are installed and restored independently.
 - [ ] Minimize and restore Obsidian, then verify card dragging and resizing still work.
+- [ ] If restored pen events report raw `isPrimary = false`, verify Mouse Emulation reports `isPrimary = true` only inside Canvas.
 - [ ] Minimize and restore Obsidian with Pan Mode selected, then verify pen-tip panning still works.
 - [ ] Enable debug logging only while collecting diagnostics; confirm pointer moves are not continuously logged.

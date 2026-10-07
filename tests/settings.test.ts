@@ -10,9 +10,11 @@ describe("sanitizeSettings", () => {
   });
 
   it("clamps configurable numeric ranges", () => {
-    const result = sanitizeSettings({ doubleClickIntervalMs: 999, panThresholdPx: 0 });
-    expect(result.doubleClickIntervalMs).toBe(600);
+    const result = sanitizeSettings({ doubleClickIntervalMs: 1_500, panThresholdPx: 0 });
+    expect(result.doubleClickIntervalMs).toBe(1_000);
     expect(result.panThresholdPx).toBe(2);
+
+    expect(sanitizeSettings({ doubleClickIntervalMs: 100 }).doubleClickIntervalMs).toBe(250);
   });
 
   it("preserves valid booleans and numbers", () => {

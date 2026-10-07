@@ -1,5 +1,10 @@
 import { PluginSettingTab, Setting, type App, type Plugin } from "obsidian";
-import type { SurfaceTabletSettings } from "./settings";
+import {
+  DOUBLE_TAP_INTERVAL_MAX_MS,
+  DOUBLE_TAP_INTERVAL_MIN_MS,
+  DOUBLE_TAP_INTERVAL_STEP_MS,
+  type SurfaceTabletSettings,
+} from "./settings";
 
 export interface SurfaceTabletSettingsHost {
   settings: SurfaceTabletSettings;
@@ -50,10 +55,16 @@ export class SurfaceTabletSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Double-tap interval")
-      .setDesc("Maximum time from the first barrel-assisted tap ending to the second starting.")
+      .setDesc(
+        "Maximum time from the first barrel-assisted tap ending to the second starting. The tested default is 600 ms.",
+      )
       .addSlider((slider) =>
         slider
-          .setLimits(200, 600, 25)
+          .setLimits(
+            DOUBLE_TAP_INTERVAL_MIN_MS,
+            DOUBLE_TAP_INTERVAL_MAX_MS,
+            DOUBLE_TAP_INTERVAL_STEP_MS,
+          )
           .setValue(this.host.settings.doubleClickIntervalMs)
           .setDynamicTooltip()
           .onChange(async (value) => {

@@ -3,11 +3,11 @@
 Surface Tablet is an Obsidian desktop plugin that makes Canvas usable with a Surface Pen by presenting supported pen interactions to Canvas as mouse interactions.
 
 > [!IMPORTANT]
-> Version 0.3 is designed for **Obsidian Desktop on Windows** and is being validated with a Microsoft Surface Pen. macOS, Linux, mobile, and non-Surface pens are not supported yet.
+> Version 0.5 is designed for **Obsidian Desktop on Windows** and has been validated with a Microsoft Surface Pen. macOS, Linux, mobile, and non-Surface pens are not supported yet.
 
 ## What it does
 
-In Tablet Mode, Surface Tablet changes only the `pointerType` reported for eligible pen events inside Canvas from `pen` to `mouse`. It preserves the event's coordinates, pressure, pointer ID, tilt, and button state. Mouse and touch input are left unchanged.
+In Tablet Mode, Surface Tablet changes the `pointerType` reported for eligible pen events inside Canvas from `pen` to `mouse`. If Windows/Electron marks the Surface Pen as non-primary after minimizing and restoring Obsidian, it also presents that Canvas pen session as primary so dragging and resizing continue to work. Coordinates, pressure, pointer ID, tilt, and button state are preserved. Mouse and touch input are left unchanged.
 
 The plugin provides two mutually exclusive persistent session modes:
 
@@ -46,7 +46,7 @@ Hover-only barrel presses are recognized by Windows but are not exposed to Obsid
 Surface Tablet includes settings for:
 
 - Startup Mouse Emulation state
-- Barrel double-click toggle and interval
+- Barrel double-click toggle and interval (250–1000 ms, with a tested 600 ms default)
 - Barrel-drag panning and movement threshold
 - Natural (opposite-direction) or direct (same-direction) panning
 - Canvas view-header controls
@@ -111,7 +111,7 @@ Capture these gestures separately so their event streams remain easy to compare:
 - Hold the barrel button while hovering, touch blank Canvas, then drag.
 - Touch blank Canvas first, press the barrel button, then drag.
 
-The buffer records changed pointer states inside Canvas, including pen, mouse, and touch classifications. It is capped at 500 events and omits note text. Tagged `[DEBUG-ST-INPUT-v1]` entries are also written to DevTools while logging is enabled.
+The buffer records changed pointer states inside Canvas, including pen, mouse, and touch classifications plus raw and reported primary-pointer state. It is capped at 500 events and omits note text. Tagged `[DEBUG-ST-INPUT-v1]` entries are also written to DevTools while logging is enabled.
 
 ## Hardware validation status
 

@@ -1,7 +1,7 @@
 import type { CanvasTargetRegistry } from "./canvas-target-registry";
 import type { SurfaceTabletModeSnapshot } from "./mode-state";
 
-type PatchedProperty = "pointerType" | "button" | "buttons";
+type PatchedProperty = "pointerType" | "button" | "buttons" | "isPrimary";
 type Getter = (this: PointerEvent) => unknown;
 
 interface DescriptorSnapshot {
@@ -52,13 +52,14 @@ export class WindowPointerPatch {
     }
 
     const snapshots = new Map<PatchedProperty, DescriptorSnapshot>();
-    for (const property of ["pointerType", "button", "buttons"] as const) {
+    for (const property of ["pointerType", "button", "buttons", "isPrimary"] as const) {
       snapshots.set(property, this.snapshotDescriptor(property));
     }
 
     const rawPointerType = requiredGetter(snapshots.get("pointerType"), "pointerType");
     const rawButton = requiredGetter(snapshots.get("button"), "button");
     const rawButtons = requiredGetter(snapshots.get("buttons"), "buttons");
+    const rawIsPrimary = requiredGetter(snapshots.get("isPrimary"), "isPrimary");
 
     const pointerTypeGetter: Getter = function (this: PointerEvent): string {
       const actual = String(rawPointerType.call(this));
@@ -74,6 +75,15 @@ export class WindowPointerPatch {
 
     const buttonsGetter: Getter = function (this: PointerEvent): number {
       return Number(rawButtons.call(this));
+    };
+
+    const isPrimaryGetter: Getter = function (this: PointerEvent): boolean {
+      const actual = Boolean(rawIsPrimary.call(this));
+      const actualType = String(rawPointerType.call(this));
+      if (!patchShouldTransform(this, actualType)) {
+        return actual;
+      }
+      return true;
     };
 
     const dependencies = this.dependencies;
@@ -95,10 +105,11 @@ export class WindowPointerPatch {
       pointerType: pointerTypeGetter,
       button: buttonGetter,
       buttons: buttonsGetter,
+      isPrimary: isPrimaryGetter,
     };
 
     try {
-      for (const property of ["pointerType", "button", "buttons"] as const) {
+      for (const property of ["pointerType", "button", "buttons", "isPrimary"] as const) {
         const snapshot = snapshots.get(property);
         if (!snapshot) {
           throw new Error(`Missing descriptor snapshot for ${property}`);
@@ -125,7 +136,7 @@ export class WindowPointerPatch {
   }
 
   isIntact(): boolean {
-    if (!this.active || this.installed.size !== 3) {
+    if (!this.active || this.installed.size !== 4) {
       return false;
     }
     for (const [property, installed] of this.installed) {
@@ -146,6 +157,10 @@ export class WindowPointerPatch {
 
   readRawButtons(event: PointerEvent): number {
     return Number(this.callRawGetter("buttons", event));
+  }
+
+  readRawIsPrimary(event: PointerEvent): boolean {
+    return Boolean(this.callRawGetter("isPrimary", event));
   }
 
   private callRawGetter(property: PatchedProperty, event: PointerEvent): unknown {

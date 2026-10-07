@@ -22,6 +22,7 @@ export interface BarrelGestureDecision {
   panStarted?: boolean;
   panEnded?: boolean;
   suppressContextMenu?: boolean;
+  trackContextMenu?: boolean;
   toggleTabletMode?: boolean;
   panDeltaX?: number;
   panDeltaY?: number;
@@ -167,6 +168,7 @@ export class BarrelGestureMachine {
 
     if (this.getConfig().doubleClickEnabled) {
       this.firstClickAt = input.timestamp;
+      return { tracked: true, trackContextMenu: true };
     }
 
     return { tracked: true };
