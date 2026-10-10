@@ -42,22 +42,31 @@ Canvas pen controls:
 The first tap of a contact double-tap is intentionally not delayed, so its context menu may briefly appear click again to toggle Mouse Emulation modes. 
 ## Toggle On/Off
 
-
-
-https://github.com/user-attachments/assets/42e2cb28-4f80-4db2-9a77-ed23da87fef9
+<video
+  src="https://raw.githubusercontent.com/Emekalim/obsidian-surface-tablet/main/assets/toggleonoff.mp4"
+  controls
+  style="width:100%;max-width:640px;aspect-ratio:4/3;">
+</video>
 
 
 ## Dragging and Resizing Demo
 
-
-
-https://github.com/user-attachments/assets/eb5a6145-94a5-40bf-b184-e2cda7279beb
+<video
+  src="https://raw.githubusercontent.com/Emekalim/obsidian-surface-tablet/main/assets/dragging.mp4"
+  controls
+  style="width:100%;max-width:640px;aspect-ratio:4/3;">
+</video>
 
 
 
 ## Panning Demo
 
-https://github.com/user-attachments/assets/2f22ead1-ae3e-4a42-a01c-6193b4d9467a
+<video
+  src="https://raw.githubusercontent.com/Emekalim/obsidian-surface-tablet/main/assets/panning.mp4"
+  controls
+  style="width:100%;max-width:640px;aspect-ratio:4/3;">
+</video>
+
 
 
 
