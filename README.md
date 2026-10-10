@@ -3,7 +3,7 @@
 Surface Tablet is an Obsidian desktop plugin that makes Canvas usable with a Surface Pen by presenting supported pen interactions to Canvas as mouse interactions.
 
 > [!IMPORTANT]
-> Version 0.5 is designed for **Obsidian Desktop on Windows** and has been validated with a Microsoft Surface Pen. macOS, Linux, mobile, and non-Surface pens are not supported yet.
+> Version 1.0 is designed for **Obsidian Desktop 1.14 or later on Windows** and has been validated with a Microsoft Surface Pen. macOS, Linux, mobile, and non-Surface pens are not supported yet.
 
 ## What it does
 
@@ -27,10 +27,10 @@ When a Canvas is loaded on Windows, its view header contains two actions:
 
 Commands are also available:
 
-- `Tablet Mode: Toggle mouse emulation`
-- `Tablet Mode: Enable mouse emulation`
-- `Tablet Mode: Disable mouse emulation`
-- `Tablet Mode: Toggle pan mode`
+- `Surface Tablet: Toggle mouse emulation`
+- `Surface Tablet: Enable mouse emulation`
+- `Surface Tablet: Disable mouse emulation`
+- `Surface Tablet: Toggle pan mode`
 
 Canvas pen controls:
 
@@ -54,13 +54,11 @@ Surface Tablet includes settings for:
 
 Runtime toggles last only for the current Obsidian session. Each launch starts from the configured default, and Pan Mode always starts disabled.
 
-## Manual installation for development
+## Manual installation
 
-This repository is private and no release build is published while Surface testing is pending.
-
-1. Run `npm install` and `npm run build`.
+1. Download `main.js`, `manifest.json`, and `styles.css` from the latest GitHub release.
 2. Create `<vault>/.obsidian/plugins/surface-tablet/`.
-3. Copy `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` into that directory.
+3. Copy the three downloaded files into that directory.
 4. Restart Obsidian and enable **Surface Tablet** in Community plugins.
 
 The ignored `dist/` directory is the complete installable plugin output. Files under `src/` are development sources and are not copied into Obsidian.
@@ -99,9 +97,9 @@ The implementation is split into independently testable pieces:
 Diagnostics are local and disabled by default. To capture a hardware trace:
 
 1. Enable **Debug logging** in Surface Tablet settings.
-2. Run `Tablet Mode: Clear pen diagnostics` from the command palette.
+2. Run `Surface Tablet: Clear pen diagnostics` from the command palette.
 3. Perform one test gesture on blank Canvas.
-4. Run `Tablet Mode: Copy pen diagnostics`.
+4. Run `Surface Tablet: Copy pen diagnostics`.
 5. Paste the copied JSON into the bug report and state whether the gesture worked.
 
 Capture these gestures separately so their event streams remain easy to compare:
@@ -115,7 +113,7 @@ The buffer records changed pointer states inside Canvas, including pen, mouse, a
 
 ## Hardware validation status
 
-Designed for Windows Surface devices and currently tested with a Microsoft Surface Pen. The repository will remain private and versioned below 1.0 until the complete manual test matrix passes on an identified Surface and pen model.
+Designed for Windows Surface devices and validated with a Microsoft Surface Pen on Obsidian Desktop 1.14. Other operating systems and pen hardware have not been validated yet.
 
 See [TESTING.md](TESTING.md) for the validation checklist.
 

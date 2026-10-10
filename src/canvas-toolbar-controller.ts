@@ -59,8 +59,8 @@ export class CanvasToolbarController {
     const state = this.dependencies.getModeState();
     for (const controls of this.controls.values()) {
       const tabletTitle = state.tabletModeEnabled
-        ? "Surface Tablet: Mouse emulation on"
-        : "Surface Tablet: Native pen mode";
+        ? "Surface Tablet: mouse emulation on"
+        : "Surface Tablet: native pen mode";
       const tabletIcon = state.tabletModeEnabled
         ? this.icon("mouse-pointer-2", "pointer")
         : this.icon("pen-tool", "pen");
@@ -72,8 +72,8 @@ export class CanvasToolbarController {
       controls.tabletButton.classList.toggle("is-active", state.tabletModeEnabled);
 
       const panTitle = state.panModeEnabled
-        ? "Surface Tablet: Pan mode on"
-        : "Surface Tablet: Pan mode off";
+        ? "Surface Tablet: pan mode on"
+        : "Surface Tablet: pan mode off";
       setIcon(controls.panButton, this.icon("hand", "move"));
       controls.panButton.setAttribute("aria-label", panTitle);
       controls.panButton.setAttribute("aria-pressed", String(state.panModeEnabled));
@@ -105,14 +105,14 @@ export class CanvasToolbarController {
   private addControls(view: FileView): CanvasControls {
     const tabletButton = view.addAction(
       this.icon("pen-tool", "pen"),
-      "Surface Tablet: Toggle mouse emulation",
+      "Surface Tablet: toggle mouse emulation",
       this.dependencies.toggleTabletMode,
     );
     tabletButton.classList.add("surface-tablet-control", "surface-tablet-mode-control");
 
     const panButton = view.addAction(
       this.icon("hand", "move"),
-      "Surface Tablet: Toggle pan mode",
+      "Surface Tablet: toggle pan mode",
       this.dependencies.togglePanMode,
     );
     panButton.classList.add("surface-tablet-control", "surface-tablet-pan-control");

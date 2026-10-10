@@ -94,37 +94,37 @@ export default class SurfaceTabletPlugin extends Plugin {
   private registerCommands(): void {
     this.addCommand({
       id: "toggle-mouse-emulation",
-      name: "Tablet Mode: Toggle mouse emulation",
+      name: "Toggle mouse emulation",
       callback: () => this.toggleTabletMode("command"),
     });
 
     this.addCommand({
       id: "enable-mouse-emulation",
-      name: "Tablet Mode: Enable mouse emulation",
+      name: "Enable mouse emulation",
       callback: () => this.setTabletMode(true, "command"),
     });
 
     this.addCommand({
       id: "disable-mouse-emulation",
-      name: "Tablet Mode: Disable mouse emulation",
+      name: "Disable mouse emulation",
       callback: () => this.setTabletMode(false, "command"),
     });
 
     this.addCommand({
       id: "toggle-pan-mode",
-      name: "Tablet Mode: Toggle pan mode",
+      name: "Toggle pan mode",
       callback: () => this.togglePanMode("command"),
     });
 
     this.addCommand({
       id: "clear-pen-diagnostics",
-      name: "Tablet Mode: Clear pen diagnostics",
+      name: "Clear pen diagnostics",
       callback: () => this.clearPenDiagnostics(),
     });
 
     this.addCommand({
       id: "copy-pen-diagnostics",
-      name: "Tablet Mode: Copy pen diagnostics",
+      name: "Copy pen diagnostics",
       callback: () => void this.copyPenDiagnostics(),
     });
   }
@@ -167,7 +167,7 @@ export default class SurfaceTabletPlugin extends Plugin {
             "Could not restore input handling after a window lifecycle change",
             error,
           );
-          new Notice("Surface Tablet: Input emulation could not be restored in this window.");
+          new Notice("Surface Tablet: input emulation could not be restored in this window.");
         }
       }
     }
@@ -218,7 +218,7 @@ export default class SurfaceTabletPlugin extends Plugin {
       patch.uninstall();
       this.failedWindows.add(ownerWindow);
       this.reportError("Input emulation is unavailable in one Obsidian window", error);
-      new Notice("Surface Tablet: Input emulation is unavailable in this window.");
+      new Notice("Surface Tablet: input emulation is unavailable in this window.");
     }
   }
 
@@ -230,7 +230,7 @@ export default class SurfaceTabletPlugin extends Plugin {
     this.debug(`Mouse emulation ${enabled ? "enabled" : "disabled"}`, { source });
     if (source !== "toolbar") {
       new Notice(
-        enabled ? "Surface Tablet: Mouse emulation enabled" : "Surface Tablet: Native pen enabled",
+        enabled ? "Surface Tablet: mouse emulation enabled" : "Surface Tablet: native pen enabled",
       );
     }
   }
@@ -243,7 +243,7 @@ export default class SurfaceTabletPlugin extends Plugin {
     this.debug(`Mouse emulation ${enabled ? "enabled" : "disabled"}`, { source });
     if (source !== "toolbar") {
       new Notice(
-        enabled ? "Surface Tablet: Mouse emulation enabled" : "Surface Tablet: Native pen enabled",
+        enabled ? "Surface Tablet: mouse emulation enabled" : "Surface Tablet: native pen enabled",
       );
     }
   }
@@ -255,7 +255,7 @@ export default class SurfaceTabletPlugin extends Plugin {
     const enabled = this.modeState.togglePanMode();
     this.debug(`Pan mode ${enabled ? "enabled" : "disabled"}`, { source });
     if (source !== "toolbar") {
-      new Notice(`Surface Tablet: Pan mode ${enabled ? "enabled" : "disabled"}`);
+      new Notice(`Surface Tablet: pan mode ${enabled ? "enabled" : "disabled"}`);
     }
   }
 
@@ -263,7 +263,7 @@ export default class SurfaceTabletPlugin extends Plugin {
     if (this.supportedPlatform) {
       return true;
     }
-    new Notice("Surface Tablet v1 supports Obsidian Desktop on Windows only.");
+    new Notice("Surface Tablet 1.0 supports Obsidian Desktop on Windows only.");
     return false;
   }
 
@@ -271,7 +271,7 @@ export default class SurfaceTabletPlugin extends Plugin {
     for (const runtime of this.windowRuntimes.values()) {
       runtime.gestures.clearDiagnostics();
     }
-    new Notice("Surface Tablet: Pen diagnostics cleared.");
+    new Notice("Surface Tablet: pen diagnostics cleared.");
   }
 
   private async copyPenDiagnostics(): Promise<void> {
@@ -310,11 +310,11 @@ export default class SurfaceTabletPlugin extends Plugin {
 
     try {
       await window.navigator.clipboard.writeText(payload);
-      new Notice(`Surface Tablet: Copied ${events.length} diagnostic events.`);
+      new Notice(`Surface Tablet: copied ${events.length} diagnostic events.`);
     } catch (error) {
       console.info("[DEBUG-ST-EXPORT-v1] Copy this diagnostic payload:", payload);
       this.reportError("Could not copy pen diagnostics; wrote them to the console instead", error);
-      new Notice("Surface Tablet: Copy failed; diagnostics were written to the console.");
+      new Notice("Surface Tablet: copy failed; diagnostics were written to the console.");
     }
   }
 

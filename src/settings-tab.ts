@@ -24,15 +24,14 @@ export class SurfaceTabletSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Surface Tablet" });
     containerEl.createEl("p", {
       text: this.host.supportedPlatform
         ? "Surface Pen controls for Obsidian Canvas on Windows. Runtime mode changes last for the current session only."
-        : "Surface Tablet v1 supports Obsidian Desktop on Windows. Input controls remain inactive on this operating system.",
+        : "Surface Tablet 1.0 supports Obsidian Desktop on Windows. Input controls remain inactive on this operating system.",
     });
 
     new Setting(containerEl)
-      .setName("Enable Tablet Mode automatically")
+      .setName("Enable tablet mode automatically")
       .setDesc("Start each Obsidian session with Canvas pen-to-mouse emulation enabled.")
       .addToggle((toggle) =>
         toggle.setValue(this.host.settings.enableTabletModeOnStartup).onChange(async (value) => {
@@ -76,7 +75,7 @@ export class SurfaceTabletSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Hold pen side button to pan")
       .setDesc(
-        "In Native Pen or Mouse Emulation mode, hold the barrel button before touching Canvas, then drag to pan temporarily.",
+        "In native pen or mouse emulation mode, hold the barrel button before touching Canvas, then drag to pan temporarily.",
       )
       .addToggle((toggle) =>
         toggle.setValue(this.host.settings.enableBarrelPan).onChange(async (value) => {
@@ -113,7 +112,7 @@ export class SurfaceTabletSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Show Canvas controls")
-      .setDesc("Show mouse-emulation and Pan Mode actions in each Canvas view header.")
+      .setDesc("Show mouse-emulation and pan mode actions in each Canvas view header.")
       .addToggle((toggle) =>
         toggle.setValue(this.host.settings.showCanvasControls).onChange(async (value) => {
           this.host.settings.showCanvasControls = value;
@@ -124,7 +123,7 @@ export class SurfaceTabletSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Debug logging")
       .setDesc(
-        "Capture raw Canvas pointer-state changes and log them to the developer console. Use the Clear and Copy pen diagnostics commands to collect a test trace.",
+        "Capture raw Canvas pointer-state changes and log them to the developer console. Use the clear and copy pen diagnostics commands to collect a test trace.",
       )
       .addToggle((toggle) =>
         toggle.setValue(this.host.settings.debugLogging).onChange(async (value) => {

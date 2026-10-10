@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - "*"
 
 permissions:
   contents: write
@@ -23,7 +23,7 @@ jobs:
         shell: bash
         run: |
           manifest_version="$(node -p "require('./manifest.json').version")"
-          test "${GITHUB_REF_NAME}" = "v${manifest_version}"
+          test "${GITHUB_REF_NAME}" = "${manifest_version}"
       - name: Publish release assets
         env:
           GH_TOKEN: ${{ github.token }}
