@@ -1,6 +1,6 @@
 {
   "name": "obsidian-surface-tablet",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Surface Pen friendly mouse emulation and panning for Obsidian Canvas on Windows.",
   "private": true,
   "type": "module",

@@ -286,11 +286,19 @@ export default class SurfaceTabletPlugin extends Plugin {
       );
     const payload = JSON.stringify(
       {
-        schema: "surface-tablet-pen-diagnostics-v2",
+        schema: "surface-tablet-pen-diagnostics-v3",
         exportedAt: new Date().toISOString(),
         pluginVersion: this.manifest.version,
-        platform: window.navigator.platform,
-        userAgent: window.navigator.userAgent,
+        platform: {
+          isDesktopApp: Platform.isDesktopApp,
+          isWin: Platform.isWin,
+          isMacOS: Platform.isMacOS,
+          isLinux: Platform.isLinux,
+        },
+        versions: {
+          electron: process.versions.electron,
+          chrome: process.versions.chrome,
+        },
         settings: {
           enableTabletModeOnStartup: this.settings.enableTabletModeOnStartup,
           enableBarrelDoubleClick: this.settings.enableBarrelDoubleClick,
@@ -312,7 +320,7 @@ export default class SurfaceTabletPlugin extends Plugin {
       await window.navigator.clipboard.writeText(payload);
       new Notice(`Surface Tablet: copied ${events.length} diagnostic events.`);
     } catch (error) {
-      console.info("[DEBUG-ST-EXPORT-v1] Copy this diagnostic payload:", payload);
+      console.debug("[DEBUG-ST-EXPORT-v1] Copy this diagnostic payload:", payload);
       this.reportError("Could not copy pen diagnostics; wrote them to the console instead", error);
       new Notice("Surface Tablet: copy failed; diagnostics were written to the console.");
     }

@@ -115,7 +115,7 @@ Diagnostics are local and disabled by default. To capture a hardware trace:
 1. Enable **Debug logging** in Surface Tablet settings.
 2. Run `Surface Tablet: Clear pen diagnostics` from the command palette.
 3. Perform one test gesture on blank Canvas.
-4. Run `Surface Tablet: Copy pen diagnostics`.
+4. Run `Surface Tablet: Copy pen diagnostics`. This copies the JSON to your clipboard.
 5. Paste the copied JSON into the bug report and state whether the gesture worked.
 
 Capture these gestures separately so their event streams remain easy to compare:
