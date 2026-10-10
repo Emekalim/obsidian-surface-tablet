@@ -225,8 +225,7 @@ function requiredGetter(
   snapshot: DescriptorSnapshot | undefined,
   property: PatchedProperty,
 ): Getter {
-  // The native getter is kept unbound on purpose and is always invoked with an explicit PointerEvent `this`.
-  // eslint-disable-next-line @typescript-eslint/unbound-method
+  // eslint-disable-next-line @typescript-eslint/unbound-method -- native getter is kept unbound and always invoked via .call(event)
   const getter = snapshot?.resolvedDescriptor.get;
   if (typeof getter !== "function") {
     throw new Error(`Missing native getter for PointerEvent.prototype.${property}`);
