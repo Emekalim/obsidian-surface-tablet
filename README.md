@@ -39,7 +39,8 @@ Canvas pen controls:
 - Two quick screen taps while holding the barrel button toggle Mouse Emulation.
 - Holding the barrel button before tip contact and dragging temporarily pans Canvas in Native Pen or Mouse Emulation mode.
 
-The first tap of a contact double-tap is intentionally not delayed, so its context menu may briefly appear click again to toggle Mouse Emulation modes. 
+The first tap of a contact double-tap is intentionally not delayed, so its context menu may briefly appear click again to toggle Mouse Emulation modes.
+
 ## Toggle On/Off
 
 <video
@@ -47,7 +48,6 @@ The first tap of a contact double-tap is intentionally not delayed, so its conte
   controls
   style="width:100%;max-width:640px;aspect-ratio:4/3;">
 </video>
-
 
 ## Dragging and Resizing Demo
 
@@ -57,8 +57,6 @@ The first tap of a contact double-tap is intentionally not delayed, so its conte
   style="width:100%;max-width:640px;aspect-ratio:4/3;">
 </video>
 
-
-
 ## Panning Demo
 
 <video
@@ -66,10 +64,6 @@ The first tap of a contact double-tap is intentionally not delayed, so its conte
   controls
   style="width:100%;max-width:640px;aspect-ratio:4/3;">
 </video>
-
-
-
-
 
 ## Settings
 
@@ -102,7 +96,6 @@ npm install
 npm run dev       # watch and rebuild dist/main.js
 npm run verify    # lint, format check, tests, metadata check, and production build
 ```
-
 
 ## Safety and compatibility
 
